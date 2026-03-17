@@ -37,7 +37,7 @@ pub fn tier_for_score(score: u32) -> Tier {
             color: GREEN,
         },
         31..=70 => Tier {
-            emoji: "💩",
+            emoji: "💪",
             name: "Loaded",
             message: "that's more like it.",
             color: YELLOW,
@@ -49,7 +49,7 @@ pub fn tier_for_score(score: u32) -> Tier {
             color: RED,
         },
         _ => Tier {
-            emoji: "☣️",
+            emoji: "💩",
             name: "SOILED",
             message: "SOILED. Must change.",
             color: BRIGHT_RED,
@@ -208,14 +208,14 @@ mod tests {
     #[test]
     fn test_tier_loaded_low() {
         let tier = tier_for_score(31);
-        assert_eq!(tier.emoji, "💩");
+        assert_eq!(tier.emoji, "💪");
         assert_eq!(tier.name, "Loaded");
     }
 
     #[test]
     fn test_tier_loaded_high() {
         let tier = tier_for_score(70);
-        assert_eq!(tier.emoji, "💩");
+        assert_eq!(tier.emoji, "💪");
     }
 
     #[test]
@@ -234,14 +234,14 @@ mod tests {
     #[test]
     fn test_tier_soiled_exact() {
         let tier = tier_for_score(100);
-        assert_eq!(tier.emoji, "☣️");
+        assert_eq!(tier.emoji, "💩");
         assert_eq!(tier.name, "SOILED");
     }
 
     #[test]
     fn test_tier_soiled_high() {
         let tier = tier_for_score(500);
-        assert_eq!(tier.emoji, "☣️");
+        assert_eq!(tier.emoji, "💩");
     }
 
     #[test]
