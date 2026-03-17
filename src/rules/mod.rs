@@ -1,4 +1,5 @@
 pub mod file_too_long;
+pub mod upward_relative_import;
 
 use std::path::Path;
 
@@ -31,6 +32,7 @@ pub trait Rule {
 pub fn all_rules() -> Vec<Box<dyn Rule>> {
     vec![
         Box::new(file_too_long::FileTooLong),
+        Box::new(upward_relative_import::UpwardRelativeImport),
     ]
 }
 
