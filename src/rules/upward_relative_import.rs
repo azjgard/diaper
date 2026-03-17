@@ -18,89 +18,101 @@ impl Rule for UpwardRelativeImport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/upward-relative-import.md"
     }
 
-    fn check(&self, source: &str, _path: &Path) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation> {
         let mut violations = Vec::new();
-
-        for line in source.lines() {
-            let trimmed = line.trim();
-
-            let import_path = match extract_import_path(trimmed) {
-                Some(p) => p,
-                None => continue,
-            };
-
-            if !import_path.starts_with("../") {
-                continue;
-            }
-
-            if import_path.contains("shared") {
-                continue;
-            }
-
-            violations.push(RuleViolation {
-                rule_name: self.name().to_string(),
-                doc_url: self.doc_url().to_string(),
-                score: SCORE_PER_VIOLATION,
-                message: format!("upward relative import: \"{import_path}\""),
-            });
-        }
-
+        collect_imports(tree.root_node(), source, &mut violations, self);
         violations
     }
 }
 
-/// Extract the import path string from an import or require statement.
-/// Returns None if the line is not an import/require.
-fn extract_import_path(line: &str) -> Option<&str> {
-    // Handle: import ... from "path" or import ... from 'path'
-    if line.starts_with("import ") {
-        if let Some(path) = extract_string_after(line, " from ") {
-            return Some(path);
+/// Walk the AST and find import statements and require() calls.
+fn collect_imports(
+    node: tree_sitter::Node,
+    source: &str,
+    violations: &mut Vec<RuleViolation>,
+    rule: &UpwardRelativeImport,
+) {
+    match node.kind() {
+        "import_statement" => {
+            if let Some(path) = extract_import_source(node, source) {
+                check_path(path, violations, rule);
+            }
         }
-        // Handle: import "path" or import 'path' (side-effect imports)
-        return extract_string_from_import(line);
+        "call_expression" => {
+            // Check for require("...") calls
+            if let Some(path) = extract_require_source(node, source) {
+                check_path(path, violations, rule);
+            }
+        }
+        _ => {}
     }
 
-    // Handle: require("path") or require('path')
-    if let Some(start) = line.find("require(") {
-        let after = &line[start + 8..];
-        return extract_quoted_string(after);
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_imports(child, source, violations, rule);
     }
+}
 
+/// Check if an import path is an upward relative import without "shared".
+fn check_path(path: &str, violations: &mut Vec<RuleViolation>, rule: &UpwardRelativeImport) {
+    if path.starts_with("../") && !path.contains("shared") {
+        violations.push(RuleViolation {
+            rule_name: rule.name().to_string(),
+            doc_url: rule.doc_url().to_string(),
+            score: SCORE_PER_VIOLATION,
+            message: format!("upward relative import: \"{path}\""),
+        });
+    }
+}
+
+/// Extract the source string from an import_statement node.
+fn extract_import_source<'a>(node: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "string" {
+            return extract_string_content(child, source);
+        }
+    }
     None
 }
 
-/// Extract a quoted string after a delimiter like " from ".
-fn extract_string_after<'a>(line: &'a str, delimiter: &str) -> Option<&'a str> {
-    let idx = line.find(delimiter)?;
-    let after = &line[idx + delimiter.len()..];
-    extract_quoted_string(after)
-}
-
-/// Extract a quoted string value (the content between matching quotes).
-fn extract_quoted_string(s: &str) -> Option<&str> {
-    let quote = s.chars().next()?;
-    if quote != '"' && quote != '\'' {
+/// Extract the source string from a require("...") call.
+fn extract_require_source<'a>(node: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
+    let func = node.child_by_field_name("function")?;
+    let func_text = &source[func.byte_range()];
+    if func_text != "require" {
         return None;
     }
-    let rest = &s[1..];
-    let end = rest.find(quote)?;
-    Some(&rest[..end])
+
+    let args = node.child_by_field_name("arguments")?;
+    let mut cursor = args.walk();
+    for child in args.children(&mut cursor) {
+        if child.kind() == "string" {
+            return extract_string_content(child, source);
+        }
+    }
+    None
 }
 
-/// Handle side-effect imports like: import "path" or import 'path'
-fn extract_string_from_import(line: &str) -> Option<&str> {
-    let after_import = line.strip_prefix("import ")?;
-    let trimmed = after_import.trim();
-    extract_quoted_string(trimmed)
+/// Extract the content of a string node (without quotes).
+fn extract_string_content<'a>(node: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "string_fragment" {
+            return Some(&source[child.byte_range()]);
+        }
+    }
+    None
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::parse_js;
 
     fn check(source: &str) -> Vec<RuleViolation> {
-        UpwardRelativeImport.check(source, Path::new("test.js"))
+        let tree = parse_js(source).unwrap();
+        UpwardRelativeImport.check(source, Path::new("src/foo.js"), &tree)
     }
 
     // --- Violations (should produce stink) ---
@@ -247,6 +259,12 @@ const v = require("./fine");
     }
 
     #[test]
+    fn test_import_in_comment_not_counted() {
+        let violations = check(r#"// import x from "../foo";"#);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
     fn test_violation_has_correct_rule_name() {
         let violations = check(r#"import x from "../foo";"#);
         assert_eq!(violations[0].rule_name, "upward-relative-import");
@@ -262,27 +280,5 @@ const v = require("./fine");
     fn test_violation_message_contains_path() {
         let violations = check(r#"import x from "../../src";"#);
         assert!(violations[0].message.contains("../../src"));
-    }
-
-    // --- extract_import_path unit tests ---
-
-    #[test]
-    fn test_extract_import_path_from_import() {
-        assert_eq!(extract_import_path(r#"import x from "../foo""#), Some("../foo"));
-    }
-
-    #[test]
-    fn test_extract_import_path_from_require() {
-        assert_eq!(extract_import_path(r#"const x = require("../foo")"#), Some("../foo"));
-    }
-
-    #[test]
-    fn test_extract_import_path_not_import() {
-        assert_eq!(extract_import_path("const x = 42;"), None);
-    }
-
-    #[test]
-    fn test_extract_import_path_side_effect() {
-        assert_eq!(extract_import_path(r#"import "../polyfill""#), Some("../polyfill"));
     }
 }

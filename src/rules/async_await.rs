@@ -17,7 +17,7 @@ impl Rule for AsyncAwait {
         "https://github.com/jordin/diaper/blob/main/docs/rules/async-await.md"
     }
 
-    fn check(&self, source: &str, path: &Path) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation> {
         let path_str = path.to_string_lossy();
 
         // Skip index.spec.js files
@@ -31,65 +31,73 @@ impl Rule for AsyncAwait {
         }
 
         let mut violations = Vec::new();
+        collect_async_await(tree.root_node(), source, &mut violations, self);
+        violations
+    }
+}
 
-        for line in source.lines() {
-            let count = count_async_await(line);
-            for _ in 0..count {
+/// Walk the AST and find async functions and await expressions.
+fn collect_async_await(
+    node: tree_sitter::Node,
+    source: &str,
+    violations: &mut Vec<RuleViolation>,
+    rule: &AsyncAwait,
+) {
+    match node.kind() {
+        // async keyword on function declarations and arrow functions
+        "function_declaration" | "arrow_function" | "function" | "generator_function_declaration" => {
+            if node.child_by_field_name("async").is_some() || is_async_node(node, source) {
+                let line = source.lines().nth(node.start_position().row).unwrap_or("");
                 violations.push(RuleViolation {
-                    rule_name: self.name().to_string(),
-                    doc_url: self.doc_url().to_string(),
+                    rule_name: rule.name().to_string(),
+                    doc_url: rule.doc_url().to_string(),
                     score: SCORE_PER_VIOLATION,
                     message: format!("async/await usage: {}", line.trim()),
                 });
             }
         }
-
-        violations
-    }
-}
-
-/// Count occurrences of `async` or `await` as whole words in a line.
-fn count_async_await(line: &str) -> u32 {
-    let mut count = 0;
-    let bytes = line.as_bytes();
-    let len = bytes.len();
-
-    for keyword in &["async", "await"] {
-        let kw_bytes = keyword.as_bytes();
-        let kw_len = kw_bytes.len();
-
-        let mut i = 0;
-        while i + kw_len <= len {
-            if &bytes[i..i + kw_len] == kw_bytes {
-                let before_ok = i == 0 || !is_word_char(bytes[i - 1]);
-                let after_ok = i + kw_len >= len || !is_word_char(bytes[i + kw_len]);
-                if before_ok && after_ok {
-                    count += 1;
-                    i += kw_len;
-                    continue;
-                }
-            }
-            i += 1;
+        // await expressions
+        "await_expression" => {
+            let line = source.lines().nth(node.start_position().row).unwrap_or("");
+            violations.push(RuleViolation {
+                rule_name: rule.name().to_string(),
+                doc_url: rule.doc_url().to_string(),
+                score: SCORE_PER_VIOLATION,
+                message: format!("async/await usage: {}", line.trim()),
+            });
         }
+        _ => {}
     }
 
-    count
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_async_await(child, source, violations, rule);
+    }
 }
 
-fn is_word_char(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_'
+/// Check if a function node has the "async" keyword by looking at its text.
+fn is_async_node(node: tree_sitter::Node, source: &str) -> bool {
+    let start = node.start_byte();
+    if start + 5 <= source.len() {
+        &source[start..start + 5] == "async"
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::parse_js;
 
     fn check(source: &str) -> Vec<RuleViolation> {
-        AsyncAwait.check(source, Path::new("src/foo.js"))
+        let tree = parse_js(source).unwrap();
+        AsyncAwait.check(source, Path::new("src/foo.js"), &tree)
     }
 
     fn check_with_path(source: &str, path: &str) -> Vec<RuleViolation> {
-        AsyncAwait.check(source, Path::new(path))
+        let tree = parse_js(source).unwrap();
+        AsyncAwait.check(source, Path::new(path), &tree)
     }
 
     // --- Violations ---
@@ -190,7 +198,6 @@ mod tests {
 
     #[test]
     fn test_async_in_variable_name_no_match() {
-        // "asyncFoo" should not match — not a whole word
         let violations = check("const asyncFoo = 1;");
         assert!(violations.is_empty());
     }
@@ -202,37 +209,22 @@ mod tests {
     }
 
     #[test]
-    fn test_async_in_string_matches() {
-        // We do simple text matching — strings count too
+    fn test_async_in_string_no_match() {
+        // tree-sitter correctly identifies this as a string, not a keyword
         let violations = check(r#"const x = "async";"#);
-        assert_eq!(violations.len(), 1);
-    }
-
-    // --- count_async_await unit tests ---
-
-    #[test]
-    fn test_count_none() {
-        assert_eq!(count_async_await("const x = 1;"), 0);
+        assert!(violations.is_empty());
     }
 
     #[test]
-    fn test_count_one_async() {
-        assert_eq!(count_async_await("async function foo() {}"), 1);
+    fn test_async_in_comment_no_match() {
+        let violations = check("// async function foo() {}");
+        assert!(violations.is_empty());
     }
 
     #[test]
-    fn test_count_one_await() {
-        assert_eq!(count_async_await("const x = await foo();"), 1);
-    }
-
-    #[test]
-    fn test_count_both() {
-        assert_eq!(count_async_await("async () => await foo()"), 2);
-    }
-
-    #[test]
-    fn test_count_no_partial_match() {
-        assert_eq!(count_async_await("asyncFoo awaitBar"), 0);
+    fn test_await_in_comment_no_match() {
+        let violations = check("/* await fetch('/api') */");
+        assert!(violations.is_empty());
     }
 
     // --- Metadata ---

@@ -27,8 +27,16 @@ pub trait Rule {
     fn doc_url(&self) -> &str;
 
     /// Score the given file. Returns zero or more violations.
-    /// `source` is the file contents, `path` is the file path.
-    fn check(&self, source: &str, path: &Path) -> Vec<RuleViolation>;
+    /// `source` is the file contents, `path` is the file path,
+    /// `tree` is the tree-sitter parse tree for the file.
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation>;
+}
+
+/// Parse JavaScript source into a tree-sitter tree.
+pub fn parse_js(source: &str) -> Option<tree_sitter::Tree> {
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).ok()?;
+    parser.parse(source, None)
 }
 
 /// Returns all registered rules.
@@ -65,5 +73,17 @@ mod tests {
             assert!(!rule.doc_url().is_empty());
             assert!(rule.doc_url().starts_with("https://"));
         }
+    }
+
+    #[test]
+    fn test_parse_js_valid() {
+        let tree = parse_js("const x = 1;");
+        assert!(tree.is_some());
+    }
+
+    #[test]
+    fn test_parse_js_empty() {
+        let tree = parse_js("");
+        assert!(tree.is_some());
     }
 }

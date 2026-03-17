@@ -17,95 +17,99 @@ impl Rule for NonDefaultExport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/non-default-export.md"
     }
 
-    fn check(&self, source: &str, _path: &Path) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation> {
         let mut violations = Vec::new();
-
-        for line in source.lines() {
-            let trimmed = line.trim();
-
-            if is_named_function_export(trimmed) {
-                let fn_name = extract_function_name(trimmed).unwrap_or("anonymous");
-                violations.push(RuleViolation {
-                    rule_name: self.name().to_string(),
-                    doc_url: self.doc_url().to_string(),
-                    score: SCORE_PER_VIOLATION,
-                    message: format!("non-default exported function: {fn_name}"),
-                });
-            }
-        }
-
+        collect_named_exports(tree.root_node(), source, &mut violations, self);
         violations
     }
 }
 
-/// Returns true if the line is a named (non-default) function export.
-fn is_named_function_export(line: &str) -> bool {
-    // Must start with "export " but NOT "export default"
-    let after_export = match line.strip_prefix("export ") {
-        Some(rest) => rest,
-        None => return false,
-    };
+/// Walk the AST looking for export_statement nodes that are named (non-default)
+/// exports containing function declarations or function expressions.
+fn collect_named_exports(
+    node: tree_sitter::Node,
+    source: &str,
+    violations: &mut Vec<RuleViolation>,
+    rule: &NonDefaultExport,
+) {
+    if node.kind() == "export_statement" {
+        // Skip default exports
+        let has_default = node.children(&mut node.walk())
+            .any(|c| c.kind() == "default");
 
-    if after_export.starts_with("default ") {
-        return false;
+        if !has_default && contains_function(node) {
+            let fn_name = extract_exported_name(node, source).unwrap_or("anonymous");
+            violations.push(RuleViolation {
+                rule_name: rule.name().to_string(),
+                doc_url: rule.doc_url().to_string(),
+                score: SCORE_PER_VIOLATION,
+                message: format!("non-default exported function: {fn_name}"),
+            });
+        }
+        return;
     }
 
-    // Match: export function, export async function, export const/let/var ... = function/arrow
-    if after_export.starts_with("function ")
-        || after_export.starts_with("async function ")
-    {
-        return true;
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_named_exports(child, source, violations, rule);
+    }
+}
+
+/// Check if a node or its children contain a function declaration,
+/// arrow function, or function expression.
+fn contains_function(node: tree_sitter::Node) -> bool {
+    match node.kind() {
+        "function_declaration" | "arrow_function" | "function" | "generator_function_declaration" => {
+            return true;
+        }
+        _ => {}
     }
 
-    // Match: export const foo = (...) => or export const foo = function
-    if after_export.starts_with("const ")
-        || after_export.starts_with("let ")
-        || after_export.starts_with("var ")
-    {
-        if let Some(after_eq) = after_export.split_once('=') {
-            let rhs = after_eq.1.trim();
-            if rhs.starts_with("function")
-                || rhs.starts_with("async")
-                || rhs.starts_with('(')
-                || rhs.contains("=>")
-            {
-                return true;
-            }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if contains_function(child) {
+            return true;
         }
     }
 
     false
 }
 
-/// Extract the function name from an export line.
-fn extract_function_name(line: &str) -> Option<&str> {
-    let after_export = line.strip_prefix("export ")?;
-
-    // "export function foo(" or "export async function foo("
-    let after_fn = if let Some(rest) = after_export.strip_prefix("async function ") {
-        rest
-    } else if let Some(rest) = after_export.strip_prefix("function ") {
-        rest
-    } else {
-        // "export const foo = ..."
-        let after_keyword = after_export
-            .strip_prefix("const ")
-            .or_else(|| after_export.strip_prefix("let "))
-            .or_else(|| after_export.strip_prefix("var "))?;
-        let end = after_keyword.find(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')?;
-        return Some(&after_keyword[..end]);
-    };
-
-    let end = after_fn.find(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')?;
-    Some(&after_fn[..end])
+/// Extract the name of the exported function.
+fn extract_exported_name<'a>(node: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        match child.kind() {
+            "function_declaration" | "generator_function_declaration" => {
+                if let Some(name_node) = child.child_by_field_name("name") {
+                    return Some(&source[name_node.byte_range()]);
+                }
+            }
+            "lexical_declaration" | "variable_declaration" => {
+                // export const foo = () => {}
+                let mut inner = child.walk();
+                for decl in child.children(&mut inner) {
+                    if decl.kind() == "variable_declarator" {
+                        if let Some(name_node) = decl.child_by_field_name("name") {
+                            return Some(&source[name_node.byte_range()]);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::parse_js;
 
     fn check(source: &str) -> Vec<RuleViolation> {
-        NonDefaultExport.check(source, Path::new("src/foo.js"))
+        let tree = parse_js(source).unwrap();
+        NonDefaultExport.check(source, Path::new("src/foo.js"), &tree)
     }
 
     // --- Violations ---
@@ -195,7 +199,6 @@ mod tests {
 
     #[test]
     fn test_export_const_non_function() {
-        // Not a function — just a value
         let violations = check("export const FOO = 42;");
         assert!(violations.is_empty());
     }
@@ -242,28 +245,6 @@ mod tests {
     fn test_message_contains_async_function_name() {
         let violations = check("export async function loadData() {}");
         assert!(violations[0].message.contains("loadData"));
-    }
-
-    // --- extract_function_name unit tests ---
-
-    #[test]
-    fn test_extract_name_function() {
-        assert_eq!(extract_function_name("export function foo() {}"), Some("foo"));
-    }
-
-    #[test]
-    fn test_extract_name_async_function() {
-        assert_eq!(extract_function_name("export async function bar() {}"), Some("bar"));
-    }
-
-    #[test]
-    fn test_extract_name_const() {
-        assert_eq!(extract_function_name("export const baz = () => {}"), Some("baz"));
-    }
-
-    #[test]
-    fn test_extract_name_not_export() {
-        assert_eq!(extract_function_name("function foo() {}"), None);
     }
 
     // --- Metadata ---

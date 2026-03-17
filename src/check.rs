@@ -33,19 +33,19 @@ pub fn tier_for_score(score: u32) -> Tier {
         0..=30 => Tier {
             emoji: "👶",
             name: "Fresh Baby",
-            message: "squeaky clean. what's the point of a diaper if you're not going to use it?",
+            message: "Squeaky clean.",
             color: GREEN,
         },
         31..=70 => Tier {
             emoji: "💪",
             name: "Loaded",
-            message: "that's more like it.",
+            message: "A little dirty, but sometimes a little dirt in the diaper is worth it.",
             color: YELLOW,
         },
         71..=99 => Tier {
             emoji: "🧨",
             name: "Blowout Warning",
-            message: "don't leave this too long or you'll get a rash",
+            message: "Don't leave this too long or you'll get a rash",
             color: RED,
         },
         _ => Tier {
@@ -62,12 +62,15 @@ pub fn check_file(path: &str) -> Result<FileResult, String> {
     let source = fs::read_to_string(path)
         .map_err(|e| format!("failed to read {path}: {e}"))?;
 
+    let tree = rules::parse_js(&source)
+        .ok_or_else(|| format!("failed to parse {path}"))?;
+
     let rules = rules::all_rules();
     let file_path = Path::new(path);
 
     let mut violations = Vec::new();
     for rule in &rules {
-        let mut rule_violations = rule.check(&source, file_path);
+        let mut rule_violations = rule.check(&source, file_path, &tree);
         violations.append(&mut rule_violations);
     }
 

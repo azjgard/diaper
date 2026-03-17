@@ -3,8 +3,7 @@ use std::path::Path;
 use super::{Rule, RuleViolation};
 
 /// Rule: ternary operator usage adds stink.
-/// Single ternary: +10. Nested/multiple ternaries in one expression: +60.
-/// Counts across the whole file to catch multi-line ternaries.
+/// Single ternary: +10. Nested ternary: +60.
 pub struct TernaryOperator;
 
 const SINGLE_SCORE: u32 = 10;
@@ -19,142 +18,112 @@ impl Rule for TernaryOperator {
         "https://github.com/jordin/diaper/blob/main/docs/rules/ternary-operator.md"
     }
 
-    fn check(&self, source: &str, _path: &Path) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation> {
         let mut violations = Vec::new();
+        let mut visited = Vec::new();
 
-        // Find all ternary expressions by tracking ? and : depth across the source.
-        // We group ternaries into "expressions" separated by semicolons/statement boundaries.
-        let expressions = find_ternary_expressions(source);
-
-        for expr in expressions {
-            if expr.ternary_count == 1 {
-                violations.push(RuleViolation {
-                    rule_name: self.name().to_string(),
-                    doc_url: self.doc_url().to_string(),
-                    score: SINGLE_SCORE,
-                    message: format!("ternary operator: {}", expr.snippet),
-                });
-            } else {
-                violations.push(RuleViolation {
-                    rule_name: self.name().to_string(),
-                    doc_url: self.doc_url().to_string(),
-                    score: NESTED_SCORE,
-                    message: format!("nested ternary ({} levels): {}", expr.ternary_count, expr.snippet),
-                });
-            }
-        }
+        collect_ternaries(tree.root_node(), source, &mut violations, &mut visited, self);
 
         violations
     }
 }
 
-struct TernaryExpression {
-    ternary_count: u32,
-    snippet: String,
+/// Walk the AST and find ternary_expression nodes.
+/// A ternary is "nested" if it contains another ternary_expression as a descendant.
+/// We track visited nodes so we don't double-count inner ternaries.
+fn collect_ternaries(
+    node: tree_sitter::Node,
+    source: &str,
+    violations: &mut Vec<RuleViolation>,
+    visited: &mut Vec<usize>,
+    rule: &TernaryOperator,
+) {
+    if node.kind() == "ternary_expression" && !visited.contains(&node.id()) {
+        let depth = count_ternary_depth(node);
+        let line = &source.lines().nth(node.start_position().row).unwrap_or("");
+
+        if depth > 1 {
+            violations.push(RuleViolation {
+                rule_name: rule.name().to_string(),
+                doc_url: rule.doc_url().to_string(),
+                score: NESTED_SCORE,
+                message: format!("nested ternary ({depth} levels): {}", line.trim()),
+            });
+        } else {
+            violations.push(RuleViolation {
+                rule_name: rule.name().to_string(),
+                doc_url: rule.doc_url().to_string(),
+                score: SINGLE_SCORE,
+                message: format!("ternary operator: {}", line.trim()),
+            });
+        }
+
+        // Mark all inner ternaries as visited so we don't report them separately
+        mark_inner_ternaries(node, visited);
+        return;
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_ternaries(child, source, violations, visited, rule);
+    }
 }
 
-/// Scan the source for ternary expressions, grouping consecutive ternaries
-/// that belong to the same statement (separated by ; or statement boundaries).
-fn find_ternary_expressions(source: &str) -> Vec<TernaryExpression> {
-    let mut results = Vec::new();
-    let bytes = source.as_bytes();
-    let len = bytes.len();
-    let mut in_single_quote = false;
-    let mut in_double_quote = false;
-    let mut in_template = false;
-
-    // Track current statement's ternary count and the line of the first ?
-    let mut current_count: u32 = 0;
-    let mut first_ternary_line: Option<usize> = None;
-
-    let lines: Vec<&str> = source.lines().collect();
-    let mut current_line: usize = 0;
-
-    let mut i = 0;
-    while i < len {
-        let b = bytes[i];
-
-        // Track line numbers
-        if b == b'\n' {
-            current_line += 1;
-            i += 1;
-            continue;
-        }
-
-        // Track string state (skip escaped quotes)
-        if b == b'\\' && (in_single_quote || in_double_quote || in_template) {
-            i += 2;
-            continue;
-        }
-
-        if b == b'\'' && !in_double_quote && !in_template {
-            in_single_quote = !in_single_quote;
-            i += 1;
-            continue;
-        }
-        if b == b'"' && !in_single_quote && !in_template {
-            in_double_quote = !in_double_quote;
-            i += 1;
-            continue;
-        }
-        if b == b'`' && !in_single_quote && !in_double_quote {
-            in_template = !in_template;
-            i += 1;
-            continue;
-        }
-
-        let in_string = in_single_quote || in_double_quote || in_template;
-
-        if !in_string {
-            if b == b'?' {
-                // Skip ?. (optional chaining) and ?? (nullish coalescing)
-                if i + 1 < len && (bytes[i + 1] == b'.' || bytes[i + 1] == b'?') {
-                    i += 2;
-                    continue;
-                }
-                current_count += 1;
-                if first_ternary_line.is_none() {
-                    first_ternary_line = Some(current_line);
-                }
-            }
-
-            // Statement boundary: ; or { or } flush the current expression
-            if b == b';' || b == b'{' || b == b'}' {
-                if current_count > 0 {
-                    let line_idx = first_ternary_line.unwrap_or(0);
-                    let snippet = lines.get(line_idx).unwrap_or(&"").trim().to_string();
-                    results.push(TernaryExpression {
-                        ternary_count: current_count,
-                        snippet,
-                    });
-                    current_count = 0;
-                    first_ternary_line = None;
-                }
-            }
-        }
-
-        i += 1;
+/// Count how many levels of ternary nesting exist from this node down.
+fn count_ternary_depth(node: tree_sitter::Node) -> u32 {
+    if node.kind() != "ternary_expression" {
+        return 0;
     }
 
-    // Flush any remaining expression at end of file
-    if current_count > 0 {
-        let line_idx = first_ternary_line.unwrap_or(0);
-        let snippet = lines.get(line_idx).unwrap_or(&"").trim().to_string();
-        results.push(TernaryExpression {
-            ternary_count: current_count,
-            snippet,
-        });
+    let mut max_child_depth = 0;
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        let child_depth = find_max_ternary_depth(child);
+        if child_depth > max_child_depth {
+            max_child_depth = child_depth;
+        }
     }
 
-    results
+    1 + max_child_depth
+}
+
+/// Find the maximum ternary depth in any descendant.
+fn find_max_ternary_depth(node: tree_sitter::Node) -> u32 {
+    if node.kind() == "ternary_expression" {
+        return count_ternary_depth(node);
+    }
+
+    let mut max_depth = 0;
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        let depth = find_max_ternary_depth(child);
+        if depth > max_depth {
+            max_depth = depth;
+        }
+    }
+
+    max_depth
+}
+
+/// Mark all ternary_expression descendants as visited.
+fn mark_inner_ternaries(node: tree_sitter::Node, visited: &mut Vec<usize>) {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "ternary_expression" {
+            visited.push(child.id());
+        }
+        mark_inner_ternaries(child, visited);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::parse_js;
 
     fn check(source: &str) -> Vec<RuleViolation> {
-        TernaryOperator.check(source, Path::new("src/foo.js"))
+        let tree = parse_js(source).unwrap();
+        TernaryOperator.check(source, Path::new("src/foo.js"), &tree)
     }
 
     // --- Single ternary ---
@@ -297,6 +266,20 @@ mod tests {
         let violations = check("const x = foo?.bar ? 'yes' : 'no';");
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].score, 10);
+    }
+
+    // --- Ternary in comment should not count ---
+
+    #[test]
+    fn test_ternary_in_comment_not_counted() {
+        let violations = check("// const x = a ? b : c;");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_ternary_in_block_comment_not_counted() {
+        let violations = check("/* a ? b : c */");
+        assert!(violations.is_empty());
     }
 
     // --- Metadata ---
