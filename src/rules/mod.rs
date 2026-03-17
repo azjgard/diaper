@@ -1,3 +1,4 @@
+pub mod async_await;
 pub mod file_too_long;
 pub mod upward_relative_import;
 
@@ -31,6 +32,7 @@ pub trait Rule {
 /// Returns all registered rules.
 pub fn all_rules() -> Vec<Box<dyn Rule>> {
     vec![
+        Box::new(async_await::AsyncAwait),
         Box::new(file_too_long::FileTooLong),
         Box::new(upward_relative_import::UpwardRelativeImport),
     ]
