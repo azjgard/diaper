@@ -85,7 +85,7 @@ pub fn check_files(paths: &[String]) -> Result<(), String> {
     }
 
     if !any_smells {
-        println!("{GREEN}all clean! no smells detected.{RESET}");
+        println!("{GREEN}All clean. ✅{RESET}");
     }
 
     Ok(())
