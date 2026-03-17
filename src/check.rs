@@ -3,6 +3,14 @@ use std::path::Path;
 
 use crate::rules::{self, RuleViolation};
 
+// ANSI color codes
+const RED: &str = "\x1b[31m";
+const YELLOW: &str = "\x1b[33m";
+const GREEN: &str = "\x1b[32m";
+const DIM: &str = "\x1b[2m";
+const BOLD: &str = "\x1b[1m";
+const RESET: &str = "\x1b[0m";
+
 /// Result of checking a single file.
 pub struct FileResult {
     pub path: String,
@@ -33,6 +41,21 @@ pub fn check_file(path: &str) -> Result<FileResult, String> {
     })
 }
 
+/// Format a URL as a clickable terminal hyperlink (OSC 8).
+/// Falls back to just the visible text if the terminal doesn't support it.
+fn hyperlink(url: &str, text: &str) -> String {
+    format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
+}
+
+/// Pick a color for the score based on severity.
+fn score_color(score: u32) -> &'static str {
+    match score {
+        0 => GREEN,
+        1..=3 => YELLOW,
+        _ => RED,
+    }
+}
+
 /// Check multiple files and print results.
 pub fn check_files(paths: &[String]) -> Result<(), String> {
     let js_paths: Vec<&String> = paths.iter()
@@ -40,7 +63,7 @@ pub fn check_files(paths: &[String]) -> Result<(), String> {
         .collect();
 
     if js_paths.is_empty() {
-        println!("no JavaScript files to check");
+        println!("{DIM}no JavaScript files to check{RESET}");
         return Ok(());
     }
 
@@ -51,16 +74,18 @@ pub fn check_files(paths: &[String]) -> Result<(), String> {
 
         if result.total_score > 0 {
             any_smells = true;
-            println!("{} (score: {})", result.path, result.total_score);
+            let color = score_color(result.total_score);
+            println!("{BOLD}{}{RESET}  {color}stink: {}{RESET}", result.path, result.total_score);
             for violation in &result.violations {
-                println!("  {} [+{}] {}", violation.rule_name, violation.score, violation.message);
-                println!("    docs: {}", violation.doc_url);
+                let doc_link = hyperlink(&violation.doc_url, "docs");
+                println!("  {YELLOW}+{}{RESET}  {DIM}{}{RESET}  {}  {DIM}{doc_link}{RESET}", violation.score, violation.rule_name, violation.message);
             }
+            println!();
         }
     }
 
     if !any_smells {
-        println!("all clean! no smells detected.");
+        println!("{GREEN}all clean! no smells detected.{RESET}");
     }
 
     Ok(())
@@ -109,7 +134,6 @@ mod tests {
 
     #[test]
     fn test_check_files_filters_non_js() {
-        // Should not error on non-js files, just skip them
         let files = vec!["foo.rs".to_string(), "bar.py".to_string()];
         let result = check_files(&files);
         assert!(result.is_ok());
@@ -122,5 +146,33 @@ mod tests {
         let path = file.path().to_str().unwrap().to_string();
         let result = check_files(&[path]);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_hyperlink_format() {
+        let link = hyperlink("https://example.com", "click me");
+        assert!(link.contains("https://example.com"));
+        assert!(link.contains("click me"));
+        // Should contain OSC 8 escape sequences
+        assert!(link.contains("\x1b]8;;"));
+    }
+
+    #[test]
+    fn test_score_color_zero_is_green() {
+        assert_eq!(score_color(0), GREEN);
+    }
+
+    #[test]
+    fn test_score_color_low_is_yellow() {
+        assert_eq!(score_color(1), YELLOW);
+        assert_eq!(score_color(2), YELLOW);
+        assert_eq!(score_color(3), YELLOW);
+    }
+
+    #[test]
+    fn test_score_color_high_is_red() {
+        assert_eq!(score_color(4), RED);
+        assert_eq!(score_color(10), RED);
+        assert_eq!(score_color(100), RED);
     }
 }
