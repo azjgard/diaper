@@ -1,6 +1,7 @@
 mod check;
 mod git;
 mod rules;
+mod watch;
 
 use clap::{Parser, Subcommand};
 
@@ -18,6 +19,8 @@ enum Commands {
         /// File path to check (if omitted, checks unstaged git changes)
         path: Option<String>,
     },
+    /// Watch for file changes and re-run checks
+    Watch,
 }
 
 fn main() {
@@ -37,6 +40,12 @@ fn main() {
             };
 
             if let Err(e) = check::check_files(&files) {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        }
+        Commands::Watch => {
+            if let Err(e) = watch::watch() {
                 eprintln!("error: {e}");
                 std::process::exit(1);
             }
