@@ -3,7 +3,8 @@ use std::path::Path;
 use super::{Rule, RuleViolation};
 
 /// Rule: ternary operator usage adds stink.
-/// Single ternary: +10. Nested ternary (more than one ? on a line): +60.
+/// Single ternary: +10. Nested/multiple ternaries in one expression: +60.
+/// Counts across the whole file to catch multi-line ternaries.
 pub struct TernaryOperator;
 
 const SINGLE_SCORE: u32 = 10;
@@ -21,26 +22,24 @@ impl Rule for TernaryOperator {
     fn check(&self, source: &str, _path: &Path) -> Vec<RuleViolation> {
         let mut violations = Vec::new();
 
-        for line in source.lines() {
-            let count = count_ternaries(line);
+        // Find all ternary expressions by tracking ? and : depth across the source.
+        // We group ternaries into "expressions" separated by semicolons/statement boundaries.
+        let expressions = find_ternary_expressions(source);
 
-            if count == 0 {
-                continue;
-            }
-
-            if count == 1 {
+        for expr in expressions {
+            if expr.ternary_count == 1 {
                 violations.push(RuleViolation {
                     rule_name: self.name().to_string(),
                     doc_url: self.doc_url().to_string(),
                     score: SINGLE_SCORE,
-                    message: format!("ternary operator: {}", line.trim()),
+                    message: format!("ternary operator: {}", expr.snippet),
                 });
             } else {
                 violations.push(RuleViolation {
                     rule_name: self.name().to_string(),
                     doc_url: self.doc_url().to_string(),
                     score: NESTED_SCORE,
-                    message: format!("nested ternary ({count} levels): {}", line.trim()),
+                    message: format!("nested ternary ({} levels): {}", expr.ternary_count, expr.snippet),
                 });
             }
         }
@@ -49,19 +48,38 @@ impl Rule for TernaryOperator {
     }
 }
 
-/// Count the number of ternary `?` operators in a line.
-/// Skores `?.` (optional chaining) and `?` inside strings.
-fn count_ternaries(line: &str) -> u32 {
-    let mut count = 0;
-    let bytes = line.as_bytes();
+struct TernaryExpression {
+    ternary_count: u32,
+    snippet: String,
+}
+
+/// Scan the source for ternary expressions, grouping consecutive ternaries
+/// that belong to the same statement (separated by ; or statement boundaries).
+fn find_ternary_expressions(source: &str) -> Vec<TernaryExpression> {
+    let mut results = Vec::new();
+    let bytes = source.as_bytes();
     let len = bytes.len();
     let mut in_single_quote = false;
     let mut in_double_quote = false;
     let mut in_template = false;
-    let mut i = 0;
 
+    // Track current statement's ternary count and the line of the first ?
+    let mut current_count: u32 = 0;
+    let mut first_ternary_line: Option<usize> = None;
+
+    let lines: Vec<&str> = source.lines().collect();
+    let mut current_line: usize = 0;
+
+    let mut i = 0;
     while i < len {
         let b = bytes[i];
+
+        // Track line numbers
+        if b == b'\n' {
+            current_line += 1;
+            i += 1;
+            continue;
+        }
 
         // Track string state (skip escaped quotes)
         if b == b'\\' && (in_single_quote || in_double_quote || in_template) {
@@ -85,20 +103,50 @@ fn count_ternaries(line: &str) -> u32 {
             continue;
         }
 
-        // Only count ? outside of strings
-        if !in_single_quote && !in_double_quote && !in_template && b == b'?' {
-            // Skip ?. (optional chaining) and ?? (nullish coalescing)
-            if i + 1 < len && (bytes[i + 1] == b'.' || bytes[i + 1] == b'?') {
-                i += 2;
-                continue;
+        let in_string = in_single_quote || in_double_quote || in_template;
+
+        if !in_string {
+            if b == b'?' {
+                // Skip ?. (optional chaining) and ?? (nullish coalescing)
+                if i + 1 < len && (bytes[i + 1] == b'.' || bytes[i + 1] == b'?') {
+                    i += 2;
+                    continue;
+                }
+                current_count += 1;
+                if first_ternary_line.is_none() {
+                    first_ternary_line = Some(current_line);
+                }
             }
-            count += 1;
+
+            // Statement boundary: ; or { or } flush the current expression
+            if b == b';' || b == b'{' || b == b'}' {
+                if current_count > 0 {
+                    let line_idx = first_ternary_line.unwrap_or(0);
+                    let snippet = lines.get(line_idx).unwrap_or(&"").trim().to_string();
+                    results.push(TernaryExpression {
+                        ternary_count: current_count,
+                        snippet,
+                    });
+                    current_count = 0;
+                    first_ternary_line = None;
+                }
+            }
         }
 
         i += 1;
     }
 
-    count
+    // Flush any remaining expression at end of file
+    if current_count > 0 {
+        let line_idx = first_ternary_line.unwrap_or(0);
+        let snippet = lines.get(line_idx).unwrap_or(&"").trim().to_string();
+        results.push(TernaryExpression {
+            ternary_count: current_count,
+            snippet,
+        });
+    }
+
+    results
 }
 
 #[cfg(test)]
@@ -132,17 +180,17 @@ mod tests {
         assert_eq!(violations[0].score, 10);
     }
 
-    // --- Nested ternary ---
+    // --- Nested ternary (single line) ---
 
     #[test]
-    fn test_nested_ternary() {
+    fn test_nested_ternary_single_line() {
         let violations = check("const x = a ? b ? c : d : e;");
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].score, 60);
     }
 
     #[test]
-    fn test_double_nested_ternary() {
+    fn test_triple_nested_ternary() {
         let violations = check("const x = a ? b ? c ? d : e : f : g;");
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].score, 60);
@@ -156,10 +204,33 @@ mod tests {
         assert_eq!(violations[0].score, 60);
     }
 
-    // --- Multiple lines ---
+    // --- Nested ternary (multi-line) ---
 
     #[test]
-    fn test_multiple_lines_with_ternaries() {
+    fn test_multiline_nested_ternary() {
+        let source = r#"  const tern = true
+    ? (await fetch("/api"))
+      ? console.log("do something totally crazy")
+      : false
+    : false;"#;
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].score, 60);
+        assert!(violations[0].message.contains("2 levels"));
+    }
+
+    #[test]
+    fn test_multiline_single_ternary() {
+        let source = "const x = condition\n  ? valueA\n  : valueB;";
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].score, 10);
+    }
+
+    // --- Multiple separate ternaries ---
+
+    #[test]
+    fn test_two_separate_ternaries() {
         let source = "const a = x ? 1 : 2;\nconst b = y ? 3 : 4;";
         let violations = check(source);
         assert_eq!(violations.len(), 2);
@@ -223,42 +294,9 @@ mod tests {
 
     #[test]
     fn test_ternary_with_optional_chaining() {
-        // One real ternary + optional chaining should be 1 ternary
         let violations = check("const x = foo?.bar ? 'yes' : 'no';");
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].score, 10);
-    }
-
-    // --- count_ternaries unit tests ---
-
-    #[test]
-    fn test_count_zero() {
-        assert_eq!(count_ternaries("const x = 42;"), 0);
-    }
-
-    #[test]
-    fn test_count_one() {
-        assert_eq!(count_ternaries("a ? b : c"), 1);
-    }
-
-    #[test]
-    fn test_count_two() {
-        assert_eq!(count_ternaries("a ? b ? c : d : e"), 2);
-    }
-
-    #[test]
-    fn test_count_skips_optional_chaining() {
-        assert_eq!(count_ternaries("foo?.bar"), 0);
-    }
-
-    #[test]
-    fn test_count_skips_nullish_coalescing() {
-        assert_eq!(count_ternaries("foo ?? bar"), 0);
-    }
-
-    #[test]
-    fn test_count_skips_string() {
-        assert_eq!(count_ternaries(r#""what?""#), 0);
     }
 
     // --- Metadata ---
