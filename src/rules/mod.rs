@@ -1,5 +1,6 @@
 pub mod async_await;
 pub mod file_too_long;
+pub mod non_default_export;
 pub mod upward_relative_import;
 
 use std::path::Path;
@@ -34,6 +35,7 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
     vec![
         Box::new(async_await::AsyncAwait),
         Box::new(file_too_long::FileTooLong),
+        Box::new(non_default_export::NonDefaultExport),
         Box::new(upward_relative_import::UpwardRelativeImport),
     ]
 }
