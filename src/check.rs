@@ -122,7 +122,7 @@ mod tests {
         let source = make_js_source(300);
         let file = create_temp_js_file(&source);
         let result = check_file(file.path().to_str().unwrap()).unwrap();
-        assert_eq!(result.total_score, 2);
+        assert_eq!(result.total_score, 20);
         assert_eq!(result.violations.len(), 1);
     }
 

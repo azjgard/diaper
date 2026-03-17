@@ -3,11 +3,12 @@ use std::path::Path;
 use super::{Rule, RuleViolation};
 
 /// Rule: files with more than 200 lines accumulate stink.
-/// +1 stink for every 50 lines above 200.
+/// +10 stink for every 50 lines above 200.
 pub struct FileTooLong;
 
 const THRESHOLD: u32 = 200;
 const LINES_PER_POINT: u32 = 50;
+const POINTS_PER_BUCKET: u32 = 10;
 
 impl Rule for FileTooLong {
     fn name(&self) -> &str {
@@ -26,17 +27,19 @@ impl Rule for FileTooLong {
         }
 
         let lines_over = line_count - THRESHOLD;
-        let score = lines_over / LINES_PER_POINT;
+        let buckets = lines_over / LINES_PER_POINT;
 
-        if score == 0 {
+        if buckets == 0 {
             return vec![];
         }
+
+        let score = buckets * POINTS_PER_BUCKET;
 
         vec![RuleViolation {
             rule_name: self.name().to_string(),
             doc_url: self.doc_url().to_string(),
             score,
-            message: format!("file is {line_count} lines (threshold: {THRESHOLD}, +1 per {LINES_PER_POINT} lines over)"),
+            message: format!("file is {line_count} lines (threshold: {THRESHOLD}, +{POINTS_PER_BUCKET} per {LINES_PER_POINT} lines over)"),
         }]
     }
 }
@@ -75,43 +78,43 @@ mod tests {
     }
 
     #[test]
-    fn test_exactly_one_point() {
+    fn test_one_bucket() {
         let rule = FileTooLong;
-        // 250 lines = 50 over, 50/50 = 1 point
+        // 250 lines = 50 over, 1 bucket * 10 = 10
         let source = make_source(250);
         let violations = rule.check(&source, Path::new("test.js"));
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 1);
+        assert_eq!(violations[0].score, 10);
     }
 
     #[test]
-    fn test_two_points() {
+    fn test_two_buckets() {
         let rule = FileTooLong;
-        // 300 lines = 100 over, 100/50 = 2 points
+        // 300 lines = 100 over, 2 buckets * 10 = 20
         let source = make_source(300);
         let violations = rule.check(&source, Path::new("test.js"));
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 2);
+        assert_eq!(violations[0].score, 20);
     }
 
     #[test]
-    fn test_six_points() {
+    fn test_six_buckets() {
         let rule = FileTooLong;
-        // 500 lines = 300 over, 300/50 = 6 points
+        // 500 lines = 300 over, 6 buckets * 10 = 60
         let source = make_source(500);
         let violations = rule.check(&source, Path::new("test.js"));
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 6);
+        assert_eq!(violations[0].score, 60);
     }
 
     #[test]
     fn test_partial_bucket_rounds_down() {
         let rule = FileTooLong;
-        // 275 lines = 75 over, 75/50 = 1 point (rounds down)
+        // 275 lines = 75 over, 1 bucket * 10 = 10 (rounds down)
         let source = make_source(275);
         let violations = rule.check(&source, Path::new("test.js"));
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 1);
+        assert_eq!(violations[0].score, 10);
     }
 
     #[test]
