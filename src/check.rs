@@ -7,6 +7,7 @@ use crate::rules::{self, RuleViolation};
 const RED: &str = "\x1b[31m";
 const YELLOW: &str = "\x1b[33m";
 const GREEN: &str = "\x1b[32m";
+const BRIGHT_RED: &str = "\x1b[91m";
 const DIM: &str = "\x1b[2m";
 const BOLD: &str = "\x1b[1m";
 const RESET: &str = "\x1b[0m";
@@ -16,6 +17,44 @@ pub struct FileResult {
     pub path: String,
     pub total_score: u32,
     pub violations: Vec<RuleViolation>,
+}
+
+/// Tier rating for a file's stink score.
+pub struct Tier {
+    pub emoji: &'static str,
+    pub name: &'static str,
+    pub message: &'static str,
+    pub color: &'static str,
+}
+
+/// Get the tier for a given stink score.
+pub fn tier_for_score(score: u32) -> Tier {
+    match score {
+        0..=30 => Tier {
+            emoji: "👶",
+            name: "Fresh Baby",
+            message: "squeaky clean. what's the point of a diaper if you're not going to use it?",
+            color: GREEN,
+        },
+        31..=70 => Tier {
+            emoji: "💩",
+            name: "Loaded",
+            message: "that's more like it.",
+            color: YELLOW,
+        },
+        71..=99 => Tier {
+            emoji: "🧨",
+            name: "Blowout Warning",
+            message: "don't leave this too long or you'll get a rash",
+            color: RED,
+        },
+        _ => Tier {
+            emoji: "☣️",
+            name: "SOILED",
+            message: "SOILED. Must change.",
+            color: BRIGHT_RED,
+        },
+    }
 }
 
 /// Check a single file against all rules.
@@ -47,15 +86,6 @@ fn hyperlink(url: &str, text: &str) -> String {
     format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
 }
 
-/// Pick a color for the score based on severity.
-fn score_color(score: u32) -> &'static str {
-    match score {
-        0 => GREEN,
-        1..=3 => YELLOW,
-        _ => RED,
-    }
-}
-
 /// Check multiple files and print results.
 pub fn check_files(paths: &[String]) -> Result<(), String> {
     let js_paths: Vec<&String> = paths.iter()
@@ -74,12 +104,16 @@ pub fn check_files(paths: &[String]) -> Result<(), String> {
 
         if result.total_score > 0 {
             any_smells = true;
-            let color = score_color(result.total_score);
-            println!("{BOLD}{}{RESET}  {color}stink: {}{RESET}", result.path, result.total_score);
+            let tier = tier_for_score(result.total_score);
+            println!(
+                "{} {BOLD}{}{RESET}  {}stink: {}  {}{RESET}",
+                tier.emoji, result.path, tier.color, result.total_score, tier.name
+            );
             for violation in &result.violations {
                 let doc_link = hyperlink(&violation.doc_url, "docs");
                 println!("  {YELLOW}+{}{RESET}  {DIM}{}{RESET}  {}  {DIM}{doc_link}{RESET}", violation.score, violation.rule_name, violation.message);
             }
+            println!("  {DIM}{}{RESET}", tier.message);
             println!();
         }
     }
@@ -153,26 +187,68 @@ mod tests {
         let link = hyperlink("https://example.com", "click me");
         assert!(link.contains("https://example.com"));
         assert!(link.contains("click me"));
-        // Should contain OSC 8 escape sequences
         assert!(link.contains("\x1b]8;;"));
     }
 
+    // --- Tier tests ---
+
     #[test]
-    fn test_score_color_zero_is_green() {
-        assert_eq!(score_color(0), GREEN);
+    fn test_tier_zero() {
+        let tier = tier_for_score(0);
+        assert_eq!(tier.emoji, "👶");
+        assert_eq!(tier.name, "Fresh Baby");
     }
 
     #[test]
-    fn test_score_color_low_is_yellow() {
-        assert_eq!(score_color(1), YELLOW);
-        assert_eq!(score_color(2), YELLOW);
-        assert_eq!(score_color(3), YELLOW);
+    fn test_tier_squeaky_clean_boundary() {
+        let tier = tier_for_score(30);
+        assert_eq!(tier.emoji, "👶");
     }
 
     #[test]
-    fn test_score_color_high_is_red() {
-        assert_eq!(score_color(4), RED);
-        assert_eq!(score_color(10), RED);
-        assert_eq!(score_color(100), RED);
+    fn test_tier_loaded_low() {
+        let tier = tier_for_score(31);
+        assert_eq!(tier.emoji, "💩");
+        assert_eq!(tier.name, "Loaded");
+    }
+
+    #[test]
+    fn test_tier_loaded_high() {
+        let tier = tier_for_score(70);
+        assert_eq!(tier.emoji, "💩");
+    }
+
+    #[test]
+    fn test_tier_blowout_low() {
+        let tier = tier_for_score(71);
+        assert_eq!(tier.emoji, "🧨");
+        assert_eq!(tier.name, "Blowout Warning");
+    }
+
+    #[test]
+    fn test_tier_blowout_high() {
+        let tier = tier_for_score(99);
+        assert_eq!(tier.emoji, "🧨");
+    }
+
+    #[test]
+    fn test_tier_soiled_exact() {
+        let tier = tier_for_score(100);
+        assert_eq!(tier.emoji, "☣️");
+        assert_eq!(tier.name, "SOILED");
+    }
+
+    #[test]
+    fn test_tier_soiled_high() {
+        let tier = tier_for_score(500);
+        assert_eq!(tier.emoji, "☣️");
+    }
+
+    #[test]
+    fn test_tier_colors() {
+        assert_eq!(tier_for_score(0).color, GREEN);
+        assert_eq!(tier_for_score(50).color, YELLOW);
+        assert_eq!(tier_for_score(80).color, RED);
+        assert_eq!(tier_for_score(100).color, BRIGHT_RED);
     }
 }

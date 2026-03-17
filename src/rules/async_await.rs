@@ -2,11 +2,11 @@ use std::path::Path;
 
 use super::{Rule, RuleViolation};
 
-/// Rule: usage of `async` or `await` keywords adds 50 stink per occurrence,
+/// Rule: usage of `async` or `await` keywords adds 100 stink per occurrence,
 /// unless the file is named "index.spec.js" or the path contains "/migrations".
 pub struct AsyncAwait;
 
-const SCORE_PER_VIOLATION: u32 = 50;
+const SCORE_PER_VIOLATION: u32 = 100;
 
 impl Rule for AsyncAwait {
     fn name(&self) -> &str {
@@ -98,14 +98,14 @@ mod tests {
     fn test_async_function() {
         let violations = check("async function foo() {}");
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 50);
+        assert_eq!(violations[0].score, 100);
     }
 
     #[test]
     fn test_await_expression() {
         let violations = check("const x = await fetch('/api');");
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 50);
+        assert_eq!(violations[0].score, 100);
     }
 
     #[test]
@@ -125,7 +125,7 @@ mod tests {
         let source = "async function foo() {\n  const x = await bar();\n}";
         let violations = check(source);
         assert_eq!(violations.len(), 2);
-        assert_eq!(violations.iter().map(|v| v.score).sum::<u32>(), 100);
+        assert_eq!(violations.iter().map(|v| v.score).sum::<u32>(), 200);
     }
 
     #[test]

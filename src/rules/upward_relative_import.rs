@@ -4,10 +4,10 @@ use super::{Rule, RuleViolation};
 
 /// Rule: imports using relative paths that go up the directory hierarchy
 /// (starting with "../") are a code smell unless the path contains "shared".
-/// Each violating import adds 50 stink.
+/// Each violating import adds 100 stink.
 pub struct UpwardRelativeImport;
 
-const SCORE_PER_VIOLATION: u32 = 50;
+const SCORE_PER_VIOLATION: u32 = 100;
 
 impl Rule for UpwardRelativeImport {
     fn name(&self) -> &str {
@@ -109,14 +109,14 @@ mod tests {
     fn test_upward_relative_import_double_quotes() {
         let violations = check(r#"import x from "../../src";"#);
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 50);
+        assert_eq!(violations[0].score, 100);
     }
 
     #[test]
     fn test_upward_relative_import_single_quotes() {
         let violations = check("import x from '../utils';");
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 50);
+        assert_eq!(violations[0].score, 100);
     }
 
     #[test]
@@ -134,14 +134,14 @@ import c from "../baz";
 "#;
         let violations = check(source);
         assert_eq!(violations.len(), 3);
-        assert_eq!(violations.iter().map(|v| v.score).sum::<u32>(), 150);
+        assert_eq!(violations.iter().map(|v| v.score).sum::<u32>(), 300);
     }
 
     #[test]
     fn test_require_upward_relative() {
         let violations = check(r#"const x = require("../foo");"#);
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 50);
+        assert_eq!(violations[0].score, 100);
     }
 
     #[test]
