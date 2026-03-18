@@ -60,6 +60,7 @@ pub const DEFAULT_ASYNC_AWAIT: u32 = 100;
 pub const DEFAULT_CTX_DESTRUCTURE: u32 = 10;
 pub const DEFAULT_FILE_TOO_LONG: u32 = 10;
 pub const DEFAULT_NON_DEFAULT_EXPORT: u32 = 50;
+pub const DEFAULT_NON_IDEMPOTENT_MIGRATION: u32 = 50;
 pub const DEFAULT_TERNARY_SINGLE: u32 = 10;
 pub const DEFAULT_TERNARY_NESTED: u32 = 60;
 pub const DEFAULT_UPWARD_RELATIVE_IMPORT: u32 = 100;
@@ -125,6 +126,7 @@ rules:
   ctx-destructure: {DEFAULT_CTX_DESTRUCTURE}
   file-too-long: {DEFAULT_FILE_TOO_LONG}
   non-default-export: {DEFAULT_NON_DEFAULT_EXPORT}
+  non-idempotent-migration: {DEFAULT_NON_IDEMPOTENT_MIGRATION}
   ternary-single: {DEFAULT_TERNARY_SINGLE}
   ternary-nested: {DEFAULT_TERNARY_NESTED}
   upward-relative-import: {DEFAULT_UPWARD_RELATIVE_IMPORT}
