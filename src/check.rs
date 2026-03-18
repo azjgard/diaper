@@ -45,21 +45,21 @@ pub fn tier_for_score(score: u32, config: &Config) -> Tier {
         }
     } else if score >= soiled_min {
         Tier {
-            emoji: "🧨",
+            emoji: "🤢",
             name: "Soiled",
             message: "Don't leave this too long or you'll get a rash",
             color: ORANGE,
         }
     } else if score >= wet_min {
         Tier {
-            emoji: "💪",
+            emoji: "💦",
             name: "Wet",
             message: "A little dirty, but sometimes a little dirt in the diaper is worth it.",
             color: YELLOW,
         }
     } else {
         Tier {
-            emoji: "👶",
+            emoji: "💧",
             name: "Damp",
             message: "Barely noticeable.",
             color: GREEN,
@@ -279,7 +279,7 @@ mod tests {
     fn test_tier_damp() {
         let c = default_config();
         let tier = tier_for_score(0, &c);
-        assert_eq!(tier.emoji, "👶");
+        assert_eq!(tier.emoji, "💧");
         assert_eq!(tier.name, "Damp");
     }
 
@@ -287,14 +287,14 @@ mod tests {
     fn test_tier_damp_boundary() {
         let c = default_config();
         let tier = tier_for_score(30, &c);
-        assert_eq!(tier.emoji, "👶");
+        assert_eq!(tier.emoji, "💧");
     }
 
     #[test]
     fn test_tier_wet_low() {
         let c = default_config();
         let tier = tier_for_score(31, &c);
-        assert_eq!(tier.emoji, "💪");
+        assert_eq!(tier.emoji, "💦");
         assert_eq!(tier.name, "Wet");
     }
 
@@ -302,14 +302,14 @@ mod tests {
     fn test_tier_wet_high() {
         let c = default_config();
         let tier = tier_for_score(70, &c);
-        assert_eq!(tier.emoji, "💪");
+        assert_eq!(tier.emoji, "💦");
     }
 
     #[test]
     fn test_tier_soiled_low() {
         let c = default_config();
         let tier = tier_for_score(71, &c);
-        assert_eq!(tier.emoji, "🧨");
+        assert_eq!(tier.emoji, "🤢");
         assert_eq!(tier.name, "Soiled");
     }
 
@@ -317,7 +317,7 @@ mod tests {
     fn test_tier_soiled_high() {
         let c = default_config();
         let tier = tier_for_score(99, &c);
-        assert_eq!(tier.emoji, "🧨");
+        assert_eq!(tier.emoji, "🤢");
     }
 
     #[test]
