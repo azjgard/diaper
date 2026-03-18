@@ -26,7 +26,6 @@ pub struct FileResult {
 pub struct Tier {
     pub emoji: &'static str,
     pub name: &'static str,
-    pub message: &'static str,
     pub color: &'static str,
 }
 
@@ -40,28 +39,24 @@ pub fn tier_for_score(score: u32, config: &Config) -> Tier {
         Tier {
             emoji: "💩",
             name: "BLOWOUT",
-            message: "Game over. The couch is ruined.",
             color: RED,
         }
     } else if score >= soiled_min {
         Tier {
             emoji: "🤢",
             name: "Soiled",
-            message: "You should probably change this -- rash imminent.",
             color: ORANGE,
         }
     } else if score >= wet_min {
         Tier {
             emoji: "💦",
             name: "Wet",
-            message: "A little dirty, but this is what diapers are made for.",
             color: YELLOW,
         }
     } else {
         Tier {
             emoji: "💧",
             name: "Damp",
-            message: "Basically dry!",
             color: GREEN,
         }
     }
@@ -106,13 +101,7 @@ pub fn check_file(path: &str, cache: &mut AstCache, config: &Config) -> Result<F
     })
 }
 
-/// Format a URL as a clickable terminal hyperlink (OSC 8).
-/// Falls back to just the visible text if the terminal doesn't support it.
-fn hyperlink(url: &str, text: &str) -> String {
-    format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
-}
-
-/// Check multiple files and print results. Returns true if any smells were found.
+/// Check multiple files and print results. Returns true if any blowouts were found.
 pub fn check_files(paths: &[String], config: &Config) -> Result<bool, String> {
     let js_paths: Vec<&String> = paths.iter()
         .filter(|p| p.ends_with(".js"))
@@ -142,11 +131,10 @@ pub fn check_files(paths: &[String], config: &Config) -> Result<bool, String> {
                 result.path, tier.color, tier.name, tier.emoji, result.total_score
             );
             for violation in &result.violations {
-                let doc_link = hyperlink(&violation.doc_url, "docs");
-                println!("  {YELLOW}+{}{RESET}  {DIM}{}{RESET}  {}  {DIM}{doc_link}{RESET}", violation.score, violation.rule_name, violation.code_sample);
-                println!("    {DIM}fix: {}{RESET}", violation.fix_suggestion);
+                println!("  {YELLOW}+{}{RESET}  {DIM}{}{RESET}  {}", violation.score, violation.rule_name, violation.code_sample);
+                println!("    {GREEN}{}{RESET}", violation.fix_suggestion);
+                println!("    {DIM}{}{RESET}", violation.doc_url);
             }
-            println!("  {DIM}{}{RESET}", tier.message);
             println!();
         }
     }
@@ -284,14 +272,6 @@ mod tests {
         let config = default_config();
         let result = check_files(&[path], &config);
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_hyperlink_format() {
-        let link = hyperlink("https://example.com", "click me");
-        assert!(link.contains("https://example.com"));
-        assert!(link.contains("click me"));
-        assert!(link.contains("\x1b]8;;"));
     }
 
     // --- Tier tests ---
