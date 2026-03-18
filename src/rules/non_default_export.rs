@@ -2,7 +2,8 @@ use std::path::Path;
 
 use super::{Rule, RuleViolation};
 
-/// Rule: functions that are exported as named (non-default) exports add 50 stink each.
+/// Rule: any function defined in a file that is not the default export adds 50 stink.
+/// This includes named exports AND local (non-exported) functions.
 /// Encourages single-responsibility files with one default export.
 pub struct NonDefaultExport;
 
@@ -20,86 +21,164 @@ impl Rule for NonDefaultExport {
     fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         let score = config.rule_score("non-default-export", SCORE_PER_VIOLATION);
         let mut violations = Vec::new();
-        collect_named_exports(tree.root_node(), source, &mut violations, self, score);
+        let root = tree.root_node();
+
+        // Find the default export's function node ID so we can skip it
+        let default_fn_id = find_default_export_function_id(root);
+
+        collect_non_default_functions(root, source, &mut violations, self, score, default_fn_id);
         violations
     }
 }
 
-fn collect_named_exports(
-    node: tree_sitter::Node,
+/// Find the node ID of the function inside a default export statement.
+fn find_default_export_function_id(root: tree_sitter::Node) -> Option<usize> {
+    let mut cursor = root.walk();
+    for child in root.children(&mut cursor) {
+        if child.kind() != "export_statement" {
+            continue;
+        }
+        let has_default = child.children(&mut child.walk()).any(|c| c.kind() == "default");
+        if !has_default {
+            continue;
+        }
+        // Find the function inside the default export
+        let mut inner = child.walk();
+        for c in child.children(&mut inner) {
+            match c.kind() {
+                "function_declaration" | "function" | "arrow_function" | "generator_function_declaration" => {
+                    return Some(c.id());
+                }
+                _ => {}
+            }
+        }
+        // The export_statement itself covers the default export
+        return Some(child.id());
+    }
+    None
+}
+
+/// Walk top-level statements and find functions that aren't the default export.
+fn collect_non_default_functions(
+    root: tree_sitter::Node,
     source: &str,
     violations: &mut Vec<RuleViolation>,
     rule: &NonDefaultExport,
     score: u32,
+    default_fn_id: Option<usize>,
 ) {
-    if node.kind() == "export_statement" {
-        let has_default = node.children(&mut node.walk())
-            .any(|c| c.kind() == "default");
-
-        if !has_default && contains_function(node) {
-            let fn_name = extract_exported_name(node, source).unwrap_or("anonymous");
-            violations.push(RuleViolation {
-                rule_name: rule.name().to_string(),
-                doc_url: rule.doc_url().to_string(),
-                score,
-                code_sample: format!("export {{ {fn_name} }}"),
-                fix_suggestion: format!("use export default for {fn_name} or move it to its own file"),
-            });
+    let mut cursor = root.walk();
+    for child in root.children(&mut cursor) {
+        // Skip the default export entirely
+        if let Some(id) = default_fn_id {
+            if child.id() == id {
+                continue;
+            }
         }
-        return;
-    }
 
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        collect_named_exports(child, source, violations, rule, score);
-    }
-}
-
-/// Check if a node or its children contain a function declaration,
-/// arrow function, or function expression.
-fn contains_function(node: tree_sitter::Node) -> bool {
-    match node.kind() {
-        "function_declaration" | "arrow_function" | "function" | "generator_function_declaration" => {
-            return true;
-        }
-        _ => {}
-    }
-
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if contains_function(child) {
-            return true;
-        }
-    }
-
-    false
-}
-
-/// Extract the name of the exported function.
-fn extract_exported_name<'a>(node: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
         match child.kind() {
+            // Top-level function declaration: function foo() {}
             "function_declaration" | "generator_function_declaration" => {
-                if let Some(name_node) = child.child_by_field_name("name") {
-                    return Some(&source[name_node.byte_range()]);
+                let fn_name = child.child_by_field_name("name")
+                    .map(|n| &source[n.byte_range()])
+                    .unwrap_or("anonymous");
+                violations.push(RuleViolation {
+                    rule_name: rule.name().to_string(),
+                    doc_url: rule.doc_url().to_string(),
+                    score,
+                    code_sample: format!("function {fn_name}"),
+                    fix_suggestion: format!("move {fn_name} to its own file or inline it"),
+                });
+            }
+            // Named export with function: export function foo() {}
+            "export_statement" => {
+                let has_default = child.children(&mut child.walk()).any(|c| c.kind() == "default");
+                if has_default {
+                    continue;
+                }
+                if let Some(fn_name) = extract_function_from_export(child, source) {
+                    violations.push(RuleViolation {
+                        rule_name: rule.name().to_string(),
+                        doc_url: rule.doc_url().to_string(),
+                        score,
+                        code_sample: format!("export {{ {fn_name} }}"),
+                        fix_suggestion: format!("move {fn_name} to its own file or use export default"),
+                    });
                 }
             }
+            // Variable declaration with function: const foo = () => {}
             "lexical_declaration" | "variable_declaration" => {
-                // export const foo = () => {}
-                let mut inner = child.walk();
-                for decl in child.children(&mut inner) {
-                    if decl.kind() == "variable_declarator" {
-                        if let Some(name_node) = decl.child_by_field_name("name") {
-                            return Some(&source[name_node.byte_range()]);
-                        }
-                    }
+                if let Some(fn_name) = extract_function_from_var_decl(child, source) {
+                    violations.push(RuleViolation {
+                        rule_name: rule.name().to_string(),
+                        doc_url: rule.doc_url().to_string(),
+                        score,
+                        code_sample: format!("const {fn_name} = ..."),
+                        fix_suggestion: format!("move {fn_name} to its own file or inline it"),
+                    });
                 }
             }
             _ => {}
         }
     }
+}
+
+/// Extract function name from a named export statement, if it contains a function.
+fn extract_function_from_export<'a>(node: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        match child.kind() {
+            "function_declaration" | "generator_function_declaration" => {
+                return child.child_by_field_name("name")
+                    .map(|n| &source[n.byte_range()]);
+            }
+            "lexical_declaration" | "variable_declaration" => {
+                return extract_function_from_var_decl(child, source);
+            }
+            _ => {}
+        }
+    }
     None
+}
+
+/// If a variable declaration assigns a function/arrow, return the variable name.
+fn extract_function_from_var_decl<'a>(node: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "variable_declarator" {
+            let name = child.child_by_field_name("name")?;
+            let value = child.child_by_field_name("value")?;
+            match value.kind() {
+                "arrow_function" | "function" => {
+                    return Some(&source[name.byte_range()]);
+                }
+                // Check for async arrow: the value might be the arrow_function itself
+                // or it could be wrapped
+                _ => {
+                    if contains_function_node(value) {
+                        return Some(&source[name.byte_range()]);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Check if a node is or contains a function expression.
+fn contains_function_node(node: tree_sitter::Node) -> bool {
+    match node.kind() {
+        "arrow_function" | "function" => true,
+        _ => {
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if contains_function_node(child) {
+                    return true;
+                }
+            }
+            false
+        }
+    }
 }
 
 #[cfg(test)]
@@ -114,7 +193,7 @@ mod tests {
         NonDefaultExport.check(source, Path::new("src/foo.js"), &tree, &mut cache, &config)
     }
 
-    // --- Violations ---
+    // --- Violations: named exports ---
 
     #[test]
     fn test_export_function() {
@@ -173,6 +252,51 @@ mod tests {
         assert_eq!(violations.iter().map(|v| v.score).sum::<u32>(), 150);
     }
 
+    // --- Violations: local (non-exported) functions ---
+
+    #[test]
+    fn test_local_function_declaration() {
+        let violations = check("function helper() {}");
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].code_sample.contains("helper"));
+    }
+
+    #[test]
+    fn test_local_const_arrow() {
+        let violations = check("const helper = () => {};");
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].code_sample.contains("helper"));
+    }
+
+    #[test]
+    fn test_local_const_function_expression() {
+        let violations = check("const helper = function() {};");
+        assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn test_local_function_alongside_default_export() {
+        let source = "function helper() {}\nexport default function main() {}";
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].code_sample.contains("helper"));
+    }
+
+    #[test]
+    fn test_local_arrow_alongside_default_export() {
+        let source = "const helper = () => {};\nexport default () => {};";
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].code_sample.contains("helper"));
+    }
+
+    #[test]
+    fn test_multiple_local_functions() {
+        let source = "function a() {}\nfunction b() {}\nconst c = () => {};";
+        let violations = check(source);
+        assert_eq!(violations.len(), 3);
+    }
+
     // --- OK (no violations) ---
 
     #[test]
@@ -190,12 +314,6 @@ mod tests {
     #[test]
     fn test_default_export_expression() {
         let violations = check("export default () => {};");
-        assert!(violations.is_empty());
-    }
-
-    #[test]
-    fn test_no_export() {
-        let violations = check("function foo() {}");
         assert!(violations.is_empty());
     }
 
@@ -218,14 +336,20 @@ mod tests {
     }
 
     #[test]
+    fn test_const_non_function() {
+        let violations = check("const x = 42;");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
     fn test_empty_file() {
         let violations = check("");
         assert!(violations.is_empty());
     }
 
     #[test]
-    fn test_no_exports() {
-        let violations = check("const x = 1;\nfunction foo() {}\nconsole.log(foo());");
+    fn test_only_constants() {
+        let violations = check("const x = 1;\nconst y = 'hello';\nconsole.log(x, y);");
         assert!(violations.is_empty());
     }
 
