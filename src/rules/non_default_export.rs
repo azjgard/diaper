@@ -87,7 +87,7 @@ fn collect_non_default_functions(
                     doc_url: rule.doc_url().to_string(),
                     score,
                     code_sample: format!("function {fn_name}"),
-                    fix_suggestion: format!("move {fn_name} to its own file or inline it"),
+                    fix_suggestion: format!("move {fn_name} to a nested module and import it instead"),
                 });
             }
             // Named export with function: export function foo() {}
@@ -102,7 +102,7 @@ fn collect_non_default_functions(
                         doc_url: rule.doc_url().to_string(),
                         score,
                         code_sample: format!("export {{ {fn_name} }}"),
-                        fix_suggestion: format!("move {fn_name} to its own file or use export default"),
+                        fix_suggestion: format!("move {fn_name} to a nested module and import it instead"),
                     });
                 }
             }
@@ -114,7 +114,7 @@ fn collect_non_default_functions(
                         doc_url: rule.doc_url().to_string(),
                         score,
                         code_sample: format!("const {fn_name} = ..."),
-                        fix_suggestion: format!("move {fn_name} to its own file or inline it"),
+                        fix_suggestion: format!("move {fn_name} to a nested module and import it instead"),
                     });
                 }
             }
