@@ -49,6 +49,7 @@ fn collect_ternaries(
                 doc_url: rule.doc_url().to_string(),
                 score: nested_score,
                 code_sample: line.trim().to_string(),
+                fix_suggestion: format!("refactor nested ternary ({depth} levels) into if/else or separate variables"),
             });
         } else {
             violations.push(RuleViolation {
@@ -56,6 +57,7 @@ fn collect_ternaries(
                 doc_url: rule.doc_url().to_string(),
                 score: single_score,
                 code_sample: line.trim().to_string(),
+                fix_suggestion: "replace ternary with if/else for readability".to_string(),
             });
         }
 

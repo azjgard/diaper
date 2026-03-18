@@ -54,6 +54,7 @@ fn collect_async_await(
                     doc_url: rule.doc_url().to_string(),
                     score,
                     code_sample: line.trim().to_string(),
+                    fix_suggestion: "remove async/await and use synchronous patterns or callbacks".to_string(),
                 });
             }
         }
@@ -64,6 +65,7 @@ fn collect_async_await(
                 doc_url: rule.doc_url().to_string(),
                 score,
                 code_sample: line.trim().to_string(),
+                fix_suggestion: "remove async/await and use synchronous patterns or callbacks".to_string(),
             });
         }
         _ => {}

@@ -21,6 +21,8 @@ pub struct RuleViolation {
     pub score: u32,
     /// Code sample or context for the violation.
     pub code_sample: String,
+    /// Succinct suggestion for how to fix the violation.
+    pub fix_suggestion: String,
 }
 
 /// A rule that can score a JavaScript file for code smells.

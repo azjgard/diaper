@@ -41,6 +41,7 @@ impl Rule for FileTooLong {
             doc_url: self.doc_url().to_string(),
             score,
             code_sample: format!("{line_count} lines"),
+            fix_suggestion: format!("split file into smaller modules (currently {line_count} lines, threshold {THRESHOLD})"),
         }]
     }
 }

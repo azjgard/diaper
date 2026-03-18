@@ -60,6 +60,7 @@ fn check_path(path: &str, violations: &mut Vec<RuleViolation>, rule: &UpwardRela
             doc_url: rule.doc_url().to_string(),
             score,
             code_sample: format!("import ... from \"{path}\""),
+            fix_suggestion: format!("use an alias or move the import to a shared module instead of \"{path}\""),
         });
     }
 }

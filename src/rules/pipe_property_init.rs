@@ -50,15 +50,15 @@ impl Rule for PipePropertyInit {
         }
 
         let mut pipe_init_props: Option<Vec<String>> = None;
+        let mut pipe_path: Option<String> = None;
 
         for candidate in &candidates {
             if let Some((idx_source, _idx_tree)) = cache.get_or_parse(candidate) {
-                // Need to clone because we borrow cache mutably
                 let idx_source = idx_source.clone();
-                // Re-parse to avoid borrow issues — the cache still has it stored
                 let re_tree = super::parse_js(&idx_source).unwrap();
                 if let Some(props) = find_pipe_init_properties(re_tree.root_node(), &idx_source) {
                     pipe_init_props = Some(props);
+                    pipe_path = Some(candidate.to_string_lossy().to_string());
                     break;
                 }
             }
@@ -66,8 +66,9 @@ impl Rule for PipePropertyInit {
 
         let init_props = match pipe_init_props {
             Some(props) => props,
-            None => return vec![], // No pipe call site found — not a violation
+            None => return vec![],
         };
+        let pipe_location = pipe_path.unwrap_or_else(|| "parent index.js".to_string());
 
         // Step 3: Report violations for properties not in the pipe init
         let mut violations = Vec::new();
@@ -78,6 +79,7 @@ impl Rule for PipePropertyInit {
                     doc_url: self.doc_url().to_string(),
                     score,
                     code_sample: format!("{{ ...ctx, {prop}: ... }}"),
+                    fix_suggestion: format!("initialize \"{prop}\" in pipe constructor in {pipe_location}"),
                 });
             }
         }

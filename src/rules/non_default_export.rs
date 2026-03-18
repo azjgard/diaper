@@ -43,6 +43,7 @@ fn collect_named_exports(
                 doc_url: rule.doc_url().to_string(),
                 score,
                 code_sample: format!("export {{ {fn_name} }}"),
+                fix_suggestion: format!("use export default for {fn_name} or move it to its own file"),
             });
         }
         return;

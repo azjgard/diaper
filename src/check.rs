@@ -137,6 +137,7 @@ pub fn check_files(paths: &[String], config: &Config) -> Result<bool, String> {
             for violation in &result.violations {
                 let doc_link = hyperlink(&violation.doc_url, "docs");
                 println!("  {YELLOW}+{}{RESET}  {DIM}{}{RESET}  {}  {DIM}{doc_link}{RESET}", violation.score, violation.rule_name, violation.code_sample);
+                println!("    {DIM}fix: {}{RESET}", violation.fix_suggestion);
             }
             println!("  {DIM}{}{RESET}", tier.message);
             println!();
@@ -165,6 +166,8 @@ struct JsonViolation {
     stink_score: u32,
     #[serde(rename = "codeSample")]
     code_sample: String,
+    #[serde(rename = "fixSuggestion")]
+    fix_suggestion: String,
     reference: String,
 }
 
@@ -193,6 +196,7 @@ pub fn check_files_json(paths: &[String], config: &Config) -> Result<bool, Strin
                     rule: v.rule_name,
                     stink_score: v.score,
                     code_sample: v.code_sample,
+                    fix_suggestion: v.fix_suggestion,
                     reference: v.doc_url,
                 }).collect(),
             });
