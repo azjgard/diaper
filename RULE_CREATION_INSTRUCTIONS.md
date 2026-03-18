@@ -37,6 +37,11 @@ impl Rule for YourRuleName {
     }
 
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        // Skip spec and migration files (standard convention)
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         // Look up configurable score, falling back to the constant default
         let score = config.rule_score("your-rule-name", SCORE_PER_VIOLATION);
 
@@ -79,6 +84,7 @@ fn collect_violations(
 ### Conventions
 
 - **`SCORE_PER_VIOLATION`**: Always define as a `const u32` at the top of the file. This is the hardcoded default.
+- **File exclusions**: Most rules should skip `index.spec.js` and `/migrations/` files. Add `if super::is_excluded_file(path) { return vec![]; }` as the first line in `check()`. Only omit this for rules that specifically target those files (e.g. `non-idempotent-migration`).
 - **Config lookup**: Always call `config.rule_score("your-rule-name", SCORE_PER_VIOLATION)` at the start of `check()` and pass the result to helper functions. Never use the constant directly in violation structs.
 - **`code_sample`**: Should be just the relevant code — no descriptive prefix. Use `line.trim().to_string()` for the line containing the violation, or a synthetic sample like `format!("import ... from \"{path}\"")` if the raw line isn't meaningful.
 - **AST walking**: Extract the recursive walk into a standalone function (not a method on the struct). Pass `rule: &YourRuleName` and `score: u32` as parameters.

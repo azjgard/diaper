@@ -18,7 +18,11 @@ impl Rule for NonDefaultExport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/non-default-export.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let score = config.rule_score("non-default-export", SCORE_PER_VIOLATION);
         let mut violations = Vec::new();
         let root = tree.root_node();

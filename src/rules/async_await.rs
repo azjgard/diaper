@@ -18,18 +18,11 @@ impl Rule for AsyncAwait {
     }
 
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let score = config.rule_score("async-await", SCORE_PER_VIOLATION);
-        let path_str = path.to_string_lossy();
-
-        // Skip index.spec.js files
-        if path.file_name().is_some_and(|f| f == "index.spec.js") {
-            return vec![];
-        }
-
-        // Skip migration files
-        if path_str.contains("/migrations") {
-            return vec![];
-        }
 
         let mut violations = Vec::new();
         collect_async_await(tree.root_node(), source, &mut violations, self, score);

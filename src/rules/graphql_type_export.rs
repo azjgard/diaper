@@ -34,6 +34,10 @@ impl Rule for GraphqlTypeExport {
     }
 
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let path_str = path.to_string_lossy();
         if !path_str.contains("InputType") && !path_str.contains("OutputType") {
             return vec![];

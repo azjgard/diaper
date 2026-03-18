@@ -18,7 +18,11 @@ impl Rule for TernaryOperator {
         "https://github.com/jordin/diaper/blob/main/docs/rules/ternary-operator.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let single_score = config.rule_score("ternary-single", SINGLE_SCORE);
         let nested_score = config.rule_score("ternary-nested", NESTED_SCORE);
         let mut violations = Vec::new();

@@ -44,6 +44,19 @@ pub trait Rule {
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache, config: &Config) -> Vec<RuleViolation>;
 }
 
+/// Returns true if the file should be skipped by most rules.
+/// Skips index.spec.js files and files in /migrations/ paths.
+pub fn is_excluded_file(path: &Path) -> bool {
+    if path.file_name().is_some_and(|f| f == "index.spec.js") {
+        return true;
+    }
+    let path_str = path.to_string_lossy();
+    if path_str.contains("/migrations") {
+        return true;
+    }
+    false
+}
+
 /// Parse JavaScript source into a tree-sitter tree.
 pub fn parse_js(source: &str) -> Option<tree_sitter::Tree> {
     let mut parser = tree_sitter::Parser::new();
