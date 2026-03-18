@@ -6,12 +6,43 @@ use serde::{Deserialize, Serialize};
 
 const CONFIG_FILE: &str = "diaper.yml";
 
+/// Per-rule configuration. Can be either a bare score number or an object
+/// with score and optional docs path.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RuleConfig {
+    /// Just a score: `async-await: 100`
+    Score(u32),
+    /// Score with optional docs: `async-await: { score: 100, docs: "./docs/async-await.md" }`
+    Full {
+        score: u32,
+        #[serde(default)]
+        docs: Option<String>,
+    },
+}
+
+impl RuleConfig {
+    pub fn score(&self) -> u32 {
+        match self {
+            RuleConfig::Score(s) => *s,
+            RuleConfig::Full { score, .. } => *score,
+        }
+    }
+
+    pub fn docs(&self) -> Option<&str> {
+        match self {
+            RuleConfig::Score(_) => None,
+            RuleConfig::Full { docs, .. } => docs.as_deref(),
+        }
+    }
+}
+
 /// Configuration loaded from diaper.yml.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
-    /// Override stink scores per rule. Key is the rule name (e.g. "async-await").
+    /// Override stink scores and docs per rule. Key is the rule name (e.g. "async-await").
     #[serde(default)]
-    pub rules: HashMap<String, u32>,
+    pub rules: HashMap<String, RuleConfig>,
 
     /// Override tier level minimums. Key is the tier name (lowercase).
     #[serde(default)]
@@ -53,7 +84,20 @@ impl Config {
 
     /// Get the score for a rule, falling back to the provided default.
     pub fn rule_score(&self, rule_name: &str, default: u32) -> u32 {
-        self.rules.get(rule_name).copied().unwrap_or(default)
+        self.rules.get(rule_name).map(|r| r.score()).unwrap_or(default)
+    }
+
+    /// Get the docs path for a rule, if configured.
+    /// Returns an absolute path resolved relative to the config file's directory.
+    pub fn rule_docs(&self, rule_name: &str) -> Option<String> {
+        let docs_path = self.rules.get(rule_name)?.docs()?;
+        // Resolve relative to CWD (where diaper.yml lives)
+        let path = Path::new(docs_path);
+        if path.is_absolute() {
+            Some(docs_path.to_string())
+        } else {
+            Some(path.to_string_lossy().to_string())
+        }
     }
 
     /// Get the tier level minimums, falling back to defaults.
@@ -68,6 +112,12 @@ pub fn generate_default_config() -> String {
         r#"# diaper configuration
 # Override stink scores per rule and tier level thresholds.
 # Remove or comment out any line to use the default value.
+#
+# Rules can be a bare score or an object with score and docs path:
+#   async-await: 100
+#   async-await:
+#     score: 100
+#     docs: ./docs/rules/async-await.md
 
 rules:
   async-await: {DEFAULT_ASYNC_AWAIT}
@@ -116,7 +166,7 @@ mod tests {
     #[test]
     fn test_rule_score_with_override() {
         let mut config = Config::default();
-        config.rules.insert("async-await".to_string(), 200);
+        config.rules.insert("async-await".to_string(), RuleConfig::Score(200));
         assert_eq!(config.rule_score("async-await", 100), 200);
     }
 
@@ -124,6 +174,49 @@ mod tests {
     fn test_rule_score_fallback() {
         let config = Config::default();
         assert_eq!(config.rule_score("async-await", 100), 100);
+    }
+
+    #[test]
+    fn test_rule_score_full_config() {
+        let mut config = Config::default();
+        config.rules.insert("async-await".to_string(), RuleConfig::Full {
+            score: 75,
+            docs: Some("./docs/async.md".to_string()),
+        });
+        assert_eq!(config.rule_score("async-await", 100), 75);
+    }
+
+    #[test]
+    fn test_rule_docs_none_by_default() {
+        let config = Config::default();
+        assert!(config.rule_docs("async-await").is_none());
+    }
+
+    #[test]
+    fn test_rule_docs_none_for_bare_score() {
+        let mut config = Config::default();
+        config.rules.insert("async-await".to_string(), RuleConfig::Score(100));
+        assert!(config.rule_docs("async-await").is_none());
+    }
+
+    #[test]
+    fn test_rule_docs_with_path() {
+        let mut config = Config::default();
+        config.rules.insert("async-await".to_string(), RuleConfig::Full {
+            score: 100,
+            docs: Some("./docs/async-await.md".to_string()),
+        });
+        assert_eq!(config.rule_docs("async-await").unwrap(), "./docs/async-await.md");
+    }
+
+    #[test]
+    fn test_rule_docs_full_without_docs() {
+        let mut config = Config::default();
+        config.rules.insert("async-await".to_string(), RuleConfig::Full {
+            score: 100,
+            docs: None,
+        });
+        assert!(config.rule_docs("async-await").is_none());
     }
 
     #[test]
@@ -140,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_yaml() {
+    fn test_parse_yaml_bare_scores() {
         let yaml = r#"
 rules:
   async-await: 50
@@ -149,9 +242,38 @@ levels:
   soiled: 200
 "#;
         let config: Config = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(config.rules["async-await"], 50);
-        assert_eq!(config.rules["file-too-long"], 5);
+        assert_eq!(config.rule_score("async-await", 100), 50);
+        assert_eq!(config.rule_score("file-too-long", 10), 5);
         assert_eq!(config.levels["soiled"], 200);
+    }
+
+    #[test]
+    fn test_parse_yaml_full_config() {
+        let yaml = r#"
+rules:
+  async-await:
+    score: 75
+    docs: ./docs/async-await.md
+"#;
+        let config: Config = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.rule_score("async-await", 100), 75);
+        assert_eq!(config.rule_docs("async-await").unwrap(), "./docs/async-await.md");
+    }
+
+    #[test]
+    fn test_parse_yaml_mixed() {
+        let yaml = r#"
+rules:
+  async-await: 50
+  file-too-long:
+    score: 5
+    docs: ./docs/file-too-long.md
+"#;
+        let config: Config = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.rule_score("async-await", 100), 50);
+        assert!(config.rule_docs("async-await").is_none());
+        assert_eq!(config.rule_score("file-too-long", 10), 5);
+        assert_eq!(config.rule_docs("file-too-long").unwrap(), "./docs/file-too-long.md");
     }
 
     #[test]
@@ -166,7 +288,7 @@ levels:
     fn test_parse_partial_yaml() {
         let yaml = "rules:\n  async-await: 25\n";
         let config: Config = serde_yaml::from_str(yaml).unwrap();
-        assert_eq!(config.rules["async-await"], 25);
+        assert_eq!(config.rule_score("async-await", 100), 25);
         assert!(config.levels.is_empty());
     }
 

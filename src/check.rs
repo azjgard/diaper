@@ -90,6 +90,13 @@ pub fn check_file(path: &str, cache: &mut AstCache, config: &Config) -> Result<F
         violations.append(&mut rule_violations);
     }
 
+    // Override doc_url with config docs path if configured
+    for violation in &mut violations {
+        if let Some(docs) = config.rule_docs(&violation.rule_name) {
+            violation.doc_url = docs;
+        }
+    }
+
     let total_score: u32 = violations.iter().map(|v| v.score).sum();
 
     Ok(FileResult {
