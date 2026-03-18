@@ -118,8 +118,8 @@ pub fn check_files(paths: &[String]) -> Result<(), String> {
             any_smells = true;
             let tier = tier_for_score(result.total_score);
             println!(
-                "{} {BOLD}{}{RESET}  {}stink: {}  {}{RESET}",
-                tier.emoji, result.path, tier.color, result.total_score, tier.name
+                "{BOLD}{}{RESET}  {}{} {} ({}){RESET}",
+                result.path, tier.color, tier.name, tier.emoji, result.total_score
             );
             for violation in &result.violations {
                 let doc_link = hyperlink(&violation.doc_url, "docs");
