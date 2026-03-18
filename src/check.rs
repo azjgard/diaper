@@ -118,12 +118,17 @@ pub fn check_files(paths: &[String], config: &Config) -> Result<bool, String> {
 
     let mut cache = AstCache::new();
     let mut any_smells = false;
+    let mut any_blowouts = false;
+    let blowout_min = config.level_min("blowout", config::DEFAULT_BLOWOUT_MIN);
 
     for path in &js_paths {
         let result = check_file(path, &mut cache, config)?;
 
         if result.total_score > 0 {
             any_smells = true;
+            if result.total_score >= blowout_min {
+                any_blowouts = true;
+            }
             let tier = tier_for_score(result.total_score, config);
             println!(
                 "{BOLD}{}{RESET}  {}{} {} ({}){RESET}",
@@ -142,7 +147,7 @@ pub fn check_files(paths: &[String], config: &Config) -> Result<bool, String> {
         println!("{GREEN}All clean. ✅{RESET}");
     }
 
-    Ok(any_smells)
+    Ok(any_blowouts)
 }
 
 #[derive(Serialize)]
@@ -171,11 +176,16 @@ pub fn check_files_json(paths: &[String], config: &Config) -> Result<bool, Strin
 
     let mut cache = AstCache::new();
     let mut results: Vec<JsonFileResult> = Vec::new();
+    let mut any_blowouts = false;
+    let blowout_min = config.level_min("blowout", config::DEFAULT_BLOWOUT_MIN);
 
     for path in &js_paths {
         let result = check_file(path, &mut cache, config)?;
 
         if result.total_score > 0 {
+            if result.total_score >= blowout_min {
+                any_blowouts = true;
+            }
             results.push(JsonFileResult {
                 path: result.path,
                 stink_score: result.total_score,
@@ -189,13 +199,11 @@ pub fn check_files_json(paths: &[String], config: &Config) -> Result<bool, Strin
         }
     }
 
-    let has_smells = !results.is_empty();
-
     let json = serde_json::to_string_pretty(&results)
         .map_err(|e| format!("failed to serialize JSON: {e}"))?;
     println!("{json}");
 
-    Ok(has_smells)
+    Ok(any_blowouts)
 }
 
 #[cfg(test)]
