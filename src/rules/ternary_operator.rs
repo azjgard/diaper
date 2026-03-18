@@ -47,14 +47,14 @@ fn collect_ternaries(
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
                 score: NESTED_SCORE,
-                message: format!("nested ternary ({depth} levels): {}", line.trim()),
+                code_sample: line.trim().to_string(),
             });
         } else {
             violations.push(RuleViolation {
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
                 score: SINGLE_SCORE,
-                message: format!("ternary operator: {}", line.trim()),
+                code_sample: line.trim().to_string(),
             });
         }
 
@@ -164,7 +164,7 @@ mod tests {
         let violations = check("const x = a ? b ? c ? d : e : f : g;");
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].score, 60);
-        assert!(violations[0].message.contains("3 levels"));
+        assert!(violations[0].code_sample.contains("?"));
     }
 
     #[test]
@@ -186,7 +186,7 @@ mod tests {
         let violations = check(source);
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].score, 60);
-        assert!(violations[0].message.contains("2 levels"));
+        assert!(violations[0].code_sample.contains("true"));
     }
 
     #[test]

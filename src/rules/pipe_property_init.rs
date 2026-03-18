@@ -76,7 +76,7 @@ impl Rule for PipePropertyInit {
                     rule_name: self.name().to_string(),
                     doc_url: self.doc_url().to_string(),
                     score: SCORE_PER_VIOLATION,
-                    message: format!("property \"{prop}\" set on ctx but not initialized in pipe"),
+                    code_sample: format!("{{ ...ctx, {prop}: ... }}"),
                 });
             }
         }
@@ -345,7 +345,7 @@ mod tests {
         let violations = check_file(&setup);
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].score, 100);
-        assert!(violations[0].message.contains("propC"));
+        assert!(violations[0].code_sample.contains("propC"));
     }
 
     #[test]
@@ -451,7 +451,7 @@ mod tests {
         );
         let violations = check_file(&setup);
         assert_eq!(violations.len(), 1);
-        assert!(violations[0].message.contains("propC"));
+        assert!(violations[0].code_sample.contains("propC"));
     }
 
     // --- Arrow function flow ---
@@ -464,7 +464,7 @@ mod tests {
         );
         let violations = check_file(&setup);
         assert_eq!(violations.len(), 1);
-        assert!(violations[0].message.contains("propC"));
+        assert!(violations[0].code_sample.contains("propC"));
     }
 
     #[test]
@@ -478,7 +478,7 @@ mod tests {
         );
         let violations = check_file(&setup);
         assert_eq!(violations.len(), 1);
-        assert!(violations[0].message.contains("propC"));
+        assert!(violations[0].code_sample.contains("propC"));
     }
 
     // --- Pipe with runAsync ---

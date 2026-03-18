@@ -17,8 +17,8 @@ pub struct RuleViolation {
     pub doc_url: String,
     /// How much stink this violation adds to the file score.
     pub score: u32,
-    /// Human-readable explanation of the violation.
-    pub message: String,
+    /// Code sample or context for the violation.
+    pub code_sample: String,
 }
 
 /// A rule that can score a JavaScript file for code smells.

@@ -60,7 +60,7 @@ fn check_path(path: &str, violations: &mut Vec<RuleViolation>, rule: &UpwardRela
             rule_name: rule.name().to_string(),
             doc_url: rule.doc_url().to_string(),
             score: SCORE_PER_VIOLATION,
-            message: format!("upward relative import: \"{path}\""),
+            code_sample: format!("import ... from \"{path}\""),
         });
     }
 }
@@ -280,6 +280,6 @@ const v = require("./fine");
     #[test]
     fn test_violation_message_contains_path() {
         let violations = check(r#"import x from "../../src";"#);
-        assert!(violations[0].message.contains("../../src"));
+        assert!(violations[0].code_sample.contains("../../src"));
     }
 }

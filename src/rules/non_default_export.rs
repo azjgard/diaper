@@ -43,7 +43,7 @@ fn collect_named_exports(
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
                 score: SCORE_PER_VIOLATION,
-                message: format!("non-default exported function: {fn_name}"),
+                code_sample: format!("export {{ {fn_name} }}"),
             });
         }
         return;
@@ -233,19 +233,19 @@ mod tests {
     #[test]
     fn test_message_contains_function_name() {
         let violations = check("export function myHelper() {}");
-        assert!(violations[0].message.contains("myHelper"));
+        assert!(violations[0].code_sample.contains("myHelper"));
     }
 
     #[test]
     fn test_message_contains_const_name() {
         let violations = check("export const doStuff = () => {};");
-        assert!(violations[0].message.contains("doStuff"));
+        assert!(violations[0].code_sample.contains("doStuff"));
     }
 
     #[test]
     fn test_message_contains_async_function_name() {
         let violations = check("export async function loadData() {}");
-        assert!(violations[0].message.contains("loadData"));
+        assert!(violations[0].code_sample.contains("loadData"));
     }
 
     // --- Metadata ---

@@ -52,7 +52,7 @@ fn collect_async_await(
                     rule_name: rule.name().to_string(),
                     doc_url: rule.doc_url().to_string(),
                     score: SCORE_PER_VIOLATION,
-                    message: format!("async/await usage: {}", line.trim()),
+                    code_sample: line.trim().to_string(),
                 });
             }
         }
@@ -63,7 +63,7 @@ fn collect_async_await(
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
                 score: SCORE_PER_VIOLATION,
-                message: format!("async/await usage: {}", line.trim()),
+                code_sample: line.trim().to_string(),
             });
         }
         _ => {}

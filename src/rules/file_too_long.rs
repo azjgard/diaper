@@ -39,7 +39,7 @@ impl Rule for FileTooLong {
             rule_name: self.name().to_string(),
             doc_url: self.doc_url().to_string(),
             score,
-            message: format!("file is {line_count} lines (threshold: {THRESHOLD}, +{POINTS_PER_BUCKET} per {LINES_PER_POINT} lines over)"),
+            code_sample: format!("{line_count} lines"),
         }]
     }
 }
