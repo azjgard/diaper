@@ -18,25 +18,26 @@ impl Rule for TernaryOperator {
         "https://github.com/jordin/diaper/blob/main/docs/rules/ternary-operator.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        let single_score = config.rule_score("ternary-single", SINGLE_SCORE);
+        let nested_score = config.rule_score("ternary-nested", NESTED_SCORE);
         let mut violations = Vec::new();
         let mut visited = Vec::new();
 
-        collect_ternaries(tree.root_node(), source, &mut violations, &mut visited, self);
+        collect_ternaries(tree.root_node(), source, &mut violations, &mut visited, self, single_score, nested_score);
 
         violations
     }
 }
 
-/// Walk the AST and find ternary_expression nodes.
-/// A ternary is "nested" if it contains another ternary_expression as a descendant.
-/// We track visited nodes so we don't double-count inner ternaries.
 fn collect_ternaries(
     node: tree_sitter::Node,
     source: &str,
     violations: &mut Vec<RuleViolation>,
     visited: &mut Vec<usize>,
     rule: &TernaryOperator,
+    single_score: u32,
+    nested_score: u32,
 ) {
     if node.kind() == "ternary_expression" && !visited.contains(&node.id()) {
         let depth = count_ternary_depth(node);
@@ -46,14 +47,14 @@ fn collect_ternaries(
             violations.push(RuleViolation {
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
-                score: NESTED_SCORE,
+                score: nested_score,
                 code_sample: line.trim().to_string(),
             });
         } else {
             violations.push(RuleViolation {
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
-                score: SINGLE_SCORE,
+                score: single_score,
                 code_sample: line.trim().to_string(),
             });
         }
@@ -65,7 +66,7 @@ fn collect_ternaries(
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_ternaries(child, source, violations, visited, rule);
+        collect_ternaries(child, source, violations, visited, rule, single_score, nested_score);
     }
 }
 
@@ -124,7 +125,8 @@ mod tests {
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
         let mut cache = super::super::AstCache::new();
-        TernaryOperator.check(source, Path::new("src/foo.js"), &tree, &mut cache)
+        let config = crate::config::Config::default();
+        TernaryOperator.check(source, Path::new("src/foo.js"), &tree, &mut cache, &config)
     }
 
     // --- Single ternary ---

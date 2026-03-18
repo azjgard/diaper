@@ -3,6 +3,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
+use crate::config::{self, Config};
 use crate::rules::{self, AstCache, RuleViolation};
 
 // ANSI color codes
@@ -29,38 +30,45 @@ pub struct Tier {
     pub color: &'static str,
 }
 
-/// Get the tier for a given stink score.
-pub fn tier_for_score(score: u32) -> Tier {
-    match score {
-        0..=30 => Tier {
-            emoji: "👶",
-            name: "Fresh Baby",
-            message: "Squeaky clean.",
-            color: GREEN,
-        },
-        31..=70 => Tier {
-            emoji: "💪",
-            name: "Loaded",
-            message: "A little dirty, but sometimes a little dirt in the diaper is worth it.",
-            color: YELLOW,
-        },
-        71..=99 => Tier {
-            emoji: "🧨",
-            name: "Blowout Warning",
-            message: "Don't leave this too long or you'll get a rash",
-            color: RED,
-        },
-        _ => Tier {
+/// Get the tier for a given stink score, using config for level thresholds.
+pub fn tier_for_score(score: u32, config: &Config) -> Tier {
+    let soiled_min = config.level_min("soiled", config::DEFAULT_SOILED_MIN);
+    let blowout_min = config.level_min("blowout", config::DEFAULT_BLOWOUT_MIN);
+    let loaded_min = config.level_min("loaded", config::DEFAULT_LOADED_MIN);
+
+    if score >= soiled_min {
+        Tier {
             emoji: "💩",
             name: "SOILED",
             message: "SOILED. Must change.",
             color: BRIGHT_RED,
-        },
+        }
+    } else if score >= blowout_min {
+        Tier {
+            emoji: "🧨",
+            name: "Blowout Warning",
+            message: "Don't leave this too long or you'll get a rash",
+            color: RED,
+        }
+    } else if score >= loaded_min {
+        Tier {
+            emoji: "💪",
+            name: "Loaded",
+            message: "A little dirty, but sometimes a little dirt in the diaper is worth it.",
+            color: YELLOW,
+        }
+    } else {
+        Tier {
+            emoji: "👶",
+            name: "Fresh Baby",
+            message: "Squeaky clean.",
+            color: GREEN,
+        }
     }
 }
 
 /// Check a single file against all rules.
-pub fn check_file(path: &str, cache: &mut AstCache) -> Result<FileResult, String> {
+pub fn check_file(path: &str, cache: &mut AstCache, config: &Config) -> Result<FileResult, String> {
     let source = fs::read_to_string(path)
         .map_err(|e| format!("failed to read {path}: {e}"))?;
 
@@ -78,7 +86,7 @@ pub fn check_file(path: &str, cache: &mut AstCache) -> Result<FileResult, String
 
     let mut violations = Vec::new();
     for rule in &rules {
-        let mut rule_violations = rule.check(&source, file_path, &tree, cache);
+        let mut rule_violations = rule.check(&source, file_path, &tree, cache, config);
         violations.append(&mut rule_violations);
     }
 
@@ -98,7 +106,7 @@ fn hyperlink(url: &str, text: &str) -> String {
 }
 
 /// Check multiple files and print results.
-pub fn check_files(paths: &[String]) -> Result<(), String> {
+pub fn check_files(paths: &[String], config: &Config) -> Result<(), String> {
     let js_paths: Vec<&String> = paths.iter()
         .filter(|p| p.ends_with(".js"))
         .collect();
@@ -112,11 +120,11 @@ pub fn check_files(paths: &[String]) -> Result<(), String> {
     let mut any_smells = false;
 
     for path in &js_paths {
-        let result = check_file(path, &mut cache)?;
+        let result = check_file(path, &mut cache, config)?;
 
         if result.total_score > 0 {
             any_smells = true;
-            let tier = tier_for_score(result.total_score);
+            let tier = tier_for_score(result.total_score, config);
             println!(
                 "{BOLD}{}{RESET}  {}{} {} ({}){RESET}",
                 result.path, tier.color, tier.name, tier.emoji, result.total_score
@@ -156,7 +164,7 @@ struct JsonViolation {
 }
 
 /// Check multiple files and print results as JSON.
-pub fn check_files_json(paths: &[String]) -> Result<(), String> {
+pub fn check_files_json(paths: &[String], config: &Config) -> Result<(), String> {
     let js_paths: Vec<&String> = paths.iter()
         .filter(|p| p.ends_with(".js"))
         .collect();
@@ -165,7 +173,7 @@ pub fn check_files_json(paths: &[String]) -> Result<(), String> {
     let mut results: Vec<JsonFileResult> = Vec::new();
 
     for path in &js_paths {
-        let result = check_file(path, &mut cache)?;
+        let result = check_file(path, &mut cache, config)?;
 
         if result.total_score > 0 {
             results.push(JsonFileResult {
@@ -206,11 +214,16 @@ mod tests {
         (0..lines).map(|i| format!("const x{i} = {i};")).collect::<Vec<_>>().join("\n")
     }
 
+    fn default_config() -> Config {
+        Config::default()
+    }
+
     #[test]
     fn test_check_file_short_file() {
         let file = create_temp_js_file("const x = 1;\n");
         let mut cache = AstCache::new();
-        let result = check_file(file.path().to_str().unwrap(), &mut cache).unwrap();
+        let config = default_config();
+        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config).unwrap();
         assert_eq!(result.total_score, 0);
         assert!(result.violations.is_empty());
     }
@@ -220,7 +233,8 @@ mod tests {
         let source = make_js_source(300);
         let file = create_temp_js_file(&source);
         let mut cache = AstCache::new();
-        let result = check_file(file.path().to_str().unwrap(), &mut cache).unwrap();
+        let config = default_config();
+        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config).unwrap();
         assert_eq!(result.total_score, 20);
         assert_eq!(result.violations.len(), 1);
     }
@@ -228,14 +242,16 @@ mod tests {
     #[test]
     fn test_check_file_nonexistent() {
         let mut cache = AstCache::new();
-        let result = check_file("/tmp/nonexistent_diaper_test.js", &mut cache);
+        let config = default_config();
+        let result = check_file("/tmp/nonexistent_diaper_test.js", &mut cache, &config);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_check_files_filters_non_js() {
         let files = vec!["foo.rs".to_string(), "bar.py".to_string()];
-        let result = check_files(&files);
+        let config = default_config();
+        let result = check_files(&files, &config);
         assert!(result.is_ok());
     }
 
@@ -244,7 +260,8 @@ mod tests {
         let source = make_js_source(10);
         let file = create_temp_js_file(&source);
         let path = file.path().to_str().unwrap().to_string();
-        let result = check_files(&[path]);
+        let config = default_config();
+        let result = check_files(&[path], &config);
         assert!(result.is_ok());
     }
 
@@ -260,61 +277,70 @@ mod tests {
 
     #[test]
     fn test_tier_zero() {
-        let tier = tier_for_score(0);
+        let c = default_config();
+        let tier = tier_for_score(0, &c);
         assert_eq!(tier.emoji, "👶");
         assert_eq!(tier.name, "Fresh Baby");
     }
 
     #[test]
     fn test_tier_squeaky_clean_boundary() {
-        let tier = tier_for_score(30);
+        let c = default_config();
+        let tier = tier_for_score(30, &c);
         assert_eq!(tier.emoji, "👶");
     }
 
     #[test]
     fn test_tier_loaded_low() {
-        let tier = tier_for_score(31);
+        let c = default_config();
+        let tier = tier_for_score(31, &c);
         assert_eq!(tier.emoji, "💪");
         assert_eq!(tier.name, "Loaded");
     }
 
     #[test]
     fn test_tier_loaded_high() {
-        let tier = tier_for_score(70);
+        let c = default_config();
+        let tier = tier_for_score(70, &c);
         assert_eq!(tier.emoji, "💪");
     }
 
     #[test]
     fn test_tier_blowout_low() {
-        let tier = tier_for_score(71);
+        let c = default_config();
+        let tier = tier_for_score(71, &c);
         assert_eq!(tier.emoji, "🧨");
         assert_eq!(tier.name, "Blowout Warning");
     }
 
     #[test]
     fn test_tier_blowout_high() {
-        let tier = tier_for_score(99);
+        let c = default_config();
+        let tier = tier_for_score(99, &c);
         assert_eq!(tier.emoji, "🧨");
     }
 
     #[test]
     fn test_tier_soiled_exact() {
-        let tier = tier_for_score(100);
+        let c = default_config();
+        let tier = tier_for_score(100, &c);
         assert_eq!(tier.emoji, "💩");
         assert_eq!(tier.name, "SOILED");
     }
 
     #[test]
     fn test_tier_soiled_high() {
-        let tier = tier_for_score(500);
+        let c = default_config();
+        let tier = tier_for_score(500, &c);
         assert_eq!(tier.emoji, "💩");
     }
 
     #[test]
     fn test_tier_colors() {
-        assert_eq!(tier_for_score(0).color, GREEN);
-        assert_eq!(tier_for_score(50).color, YELLOW);
-        assert_eq!(tier_for_score(80).color, RED);
-        assert_eq!(tier_for_score(100).color, BRIGHT_RED);
+        let c = default_config();
+        assert_eq!(tier_for_score(0, &c).color, GREEN);
+        assert_eq!(tier_for_score(50, &c).color, YELLOW);
+        assert_eq!(tier_for_score(80, &c).color, RED);
+        assert_eq!(tier_for_score(100, &c).color, BRIGHT_RED);
     }
 }

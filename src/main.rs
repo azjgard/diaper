@@ -1,4 +1,5 @@
 mod check;
+mod config;
 mod git;
 mod rules;
 mod watch;
@@ -24,6 +25,8 @@ enum Commands {
     },
     /// Watch for file changes and re-run checks
     Watch,
+    /// Generate a default diaper.yml config file
+    Init,
 }
 
 fn main() {
@@ -31,6 +34,14 @@ fn main() {
 
     match cli.command {
         Commands::Check { path, json } => {
+            let config = match config::Config::load() {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    std::process::exit(1);
+                }
+            };
+
             let files = match path {
                 Some(p) => vec![p],
                 None => match git::unstaged_changed_files() {
@@ -43,9 +54,9 @@ fn main() {
             };
 
             let result = if json {
-                check::check_files_json(&files)
+                check::check_files_json(&files, &config)
             } else {
-                check::check_files(&files)
+                check::check_files(&files, &config)
             };
 
             if let Err(e) = result {
@@ -55,6 +66,12 @@ fn main() {
         }
         Commands::Watch => {
             if let Err(e) = watch::watch() {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        }
+        Commands::Init => {
+            if let Err(e) = config::init_config() {
                 eprintln!("error: {e}");
                 std::process::exit(1);
             }

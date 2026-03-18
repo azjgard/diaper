@@ -17,7 +17,8 @@ impl Rule for AsyncAwait {
         "https://github.com/jordin/diaper/blob/main/docs/rules/async-await.md"
     }
 
-    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        let score = config.rule_score("async-await", SCORE_PER_VIOLATION);
         let path_str = path.to_string_lossy();
 
         // Skip index.spec.js files
@@ -31,7 +32,7 @@ impl Rule for AsyncAwait {
         }
 
         let mut violations = Vec::new();
-        collect_async_await(tree.root_node(), source, &mut violations, self);
+        collect_async_await(tree.root_node(), source, &mut violations, self, score);
         violations
     }
 }
@@ -42,27 +43,26 @@ fn collect_async_await(
     source: &str,
     violations: &mut Vec<RuleViolation>,
     rule: &AsyncAwait,
+    score: u32,
 ) {
     match node.kind() {
-        // async keyword on function declarations and arrow functions
         "function_declaration" | "arrow_function" | "function" | "generator_function_declaration" => {
             if node.child_by_field_name("async").is_some() || is_async_node(node, source) {
                 let line = source.lines().nth(node.start_position().row).unwrap_or("");
                 violations.push(RuleViolation {
                     rule_name: rule.name().to_string(),
                     doc_url: rule.doc_url().to_string(),
-                    score: SCORE_PER_VIOLATION,
+                    score,
                     code_sample: line.trim().to_string(),
                 });
             }
         }
-        // await expressions
         "await_expression" => {
             let line = source.lines().nth(node.start_position().row).unwrap_or("");
             violations.push(RuleViolation {
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
-                score: SCORE_PER_VIOLATION,
+                score,
                 code_sample: line.trim().to_string(),
             });
         }
@@ -71,7 +71,7 @@ fn collect_async_await(
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_async_await(child, source, violations, rule);
+        collect_async_await(child, source, violations, rule, score);
     }
 }
 
@@ -93,13 +93,15 @@ mod tests {
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
         let mut cache = super::super::AstCache::new();
-        AsyncAwait.check(source, Path::new("src/foo.js"), &tree, &mut cache)
+        let config = crate::config::Config::default();
+        AsyncAwait.check(source, Path::new("src/foo.js"), &tree, &mut cache, &config)
     }
 
     fn check_with_path(source: &str, path: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
         let mut cache = super::super::AstCache::new();
-        AsyncAwait.check(source, Path::new(path), &tree, &mut cache)
+        let config = crate::config::Config::default();
+        AsyncAwait.check(source, Path::new(path), &tree, &mut cache, &config)
     }
 
     // --- Violations ---

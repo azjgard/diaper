@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::config::Config;
+
 /// A single violation found by a rule.
 pub struct RuleViolation {
     /// Name of the rule that was violated.
@@ -33,7 +35,7 @@ pub trait Rule {
     /// `source` is the file contents, `path` is the file path,
     /// `tree` is the tree-sitter parse tree for the file,
     /// `cache` allows rules to parse and access other files' ASTs on demand.
-    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache) -> Vec<RuleViolation>;
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache, config: &Config) -> Vec<RuleViolation>;
 }
 
 /// Parse JavaScript source into a tree-sitter tree.

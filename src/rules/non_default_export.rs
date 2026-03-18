@@ -17,23 +17,22 @@ impl Rule for NonDefaultExport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/non-default-export.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        let score = config.rule_score("non-default-export", SCORE_PER_VIOLATION);
         let mut violations = Vec::new();
-        collect_named_exports(tree.root_node(), source, &mut violations, self);
+        collect_named_exports(tree.root_node(), source, &mut violations, self, score);
         violations
     }
 }
 
-/// Walk the AST looking for export_statement nodes that are named (non-default)
-/// exports containing function declarations or function expressions.
 fn collect_named_exports(
     node: tree_sitter::Node,
     source: &str,
     violations: &mut Vec<RuleViolation>,
     rule: &NonDefaultExport,
+    score: u32,
 ) {
     if node.kind() == "export_statement" {
-        // Skip default exports
         let has_default = node.children(&mut node.walk())
             .any(|c| c.kind() == "default");
 
@@ -42,7 +41,7 @@ fn collect_named_exports(
             violations.push(RuleViolation {
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
-                score: SCORE_PER_VIOLATION,
+                score,
                 code_sample: format!("export {{ {fn_name} }}"),
             });
         }
@@ -51,7 +50,7 @@ fn collect_named_exports(
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_named_exports(child, source, violations, rule);
+        collect_named_exports(child, source, violations, rule, score);
     }
 }
 
@@ -110,7 +109,8 @@ mod tests {
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
         let mut cache = super::super::AstCache::new();
-        NonDefaultExport.check(source, Path::new("src/foo.js"), &tree, &mut cache)
+        let config = crate::config::Config::default();
+        NonDefaultExport.check(source, Path::new("src/foo.js"), &tree, &mut cache, &config)
     }
 
     // --- Violations ---

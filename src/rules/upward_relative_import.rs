@@ -18,9 +18,10 @@ impl Rule for UpwardRelativeImport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/upward-relative-import.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        let score = config.rule_score("upward-relative-import", SCORE_PER_VIOLATION);
         let mut violations = Vec::new();
-        collect_imports(tree.root_node(), source, &mut violations, self);
+        collect_imports(tree.root_node(), source, &mut violations, self, score);
         violations
     }
 }
@@ -31,17 +32,17 @@ fn collect_imports(
     source: &str,
     violations: &mut Vec<RuleViolation>,
     rule: &UpwardRelativeImport,
+    score: u32,
 ) {
     match node.kind() {
         "import_statement" => {
             if let Some(path) = extract_import_source(node, source) {
-                check_path(path, violations, rule);
+                check_path(path, violations, rule, score);
             }
         }
         "call_expression" => {
-            // Check for require("...") calls
             if let Some(path) = extract_require_source(node, source) {
-                check_path(path, violations, rule);
+                check_path(path, violations, rule, score);
             }
         }
         _ => {}
@@ -49,17 +50,15 @@ fn collect_imports(
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_imports(child, source, violations, rule);
+        collect_imports(child, source, violations, rule, score);
     }
 }
-
-/// Check if an import path is an upward relative import without "shared".
-fn check_path(path: &str, violations: &mut Vec<RuleViolation>, rule: &UpwardRelativeImport) {
+fn check_path(path: &str, violations: &mut Vec<RuleViolation>, rule: &UpwardRelativeImport, score: u32) {
     if path.starts_with("../") && !path.contains("shared") {
         violations.push(RuleViolation {
             rule_name: rule.name().to_string(),
             doc_url: rule.doc_url().to_string(),
-            score: SCORE_PER_VIOLATION,
+            score,
             code_sample: format!("import ... from \"{path}\""),
         });
     }
@@ -113,7 +112,8 @@ mod tests {
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
         let mut cache = super::super::AstCache::new();
-        UpwardRelativeImport.check(source, Path::new("src/foo.js"), &tree, &mut cache)
+        let config = crate::config::Config::default();
+        UpwardRelativeImport.check(source, Path::new("src/foo.js"), &tree, &mut cache, &config)
     }
 
     // --- Violations (should produce stink) ---

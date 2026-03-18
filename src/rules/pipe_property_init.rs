@@ -26,7 +26,8 @@ impl Rule for PipePropertyInit {
         "https://github.com/jordin/diaper/blob/main/docs/rules/pipe-property-init.md"
     }
 
-    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        let score = config.rule_score("pipe-property-init", SCORE_PER_VIOLATION);
         // Step 1: Is this a pipe flow function?
         let ctx_props = match find_ctx_spread_properties(tree.root_node(), source) {
             Some(props) if !props.is_empty() => props,
@@ -75,7 +76,7 @@ impl Rule for PipePropertyInit {
                 violations.push(RuleViolation {
                     rule_name: self.name().to_string(),
                     doc_url: self.doc_url().to_string(),
-                    score: SCORE_PER_VIOLATION,
+                    score,
                     code_sample: format!("{{ ...ctx, {prop}: ... }}"),
                 });
             }
@@ -329,7 +330,8 @@ mod tests {
         let source = fs::read_to_string(&setup.flow_path).unwrap();
         let tree = parse_js(&source).unwrap();
         let mut cache = AstCache::new();
-        PipePropertyInit.check(&source, &setup.flow_path, &tree, &mut cache)
+        let config = crate::config::Config::default();
+        PipePropertyInit.check(&source, &setup.flow_path, &tree, &mut cache, &config)
     }
 
     // --- Violations ---
@@ -435,7 +437,8 @@ mod tests {
         let source = fs::read_to_string(&flow_path).unwrap();
         let tree = parse_js(&source).unwrap();
         let mut cache = AstCache::new();
-        let violations = PipePropertyInit.check(&source, &flow_path, &tree, &mut cache);
+        let config = crate::config::Config::default();
+        let violations = PipePropertyInit.check(&source, &flow_path, &tree, &mut cache, &config);
         assert!(violations.is_empty()); // No pipe call site found
     }
 
@@ -528,7 +531,8 @@ mod tests {
         let source = "";
         let tree = parse_js(source).unwrap();
         let mut cache = AstCache::new();
-        let violations = PipePropertyInit.check(source, Path::new("test.js"), &tree, &mut cache);
+        let config = crate::config::Config::default();
+        let violations = PipePropertyInit.check(source, Path::new("test.js"), &tree, &mut cache, &config);
         assert!(violations.is_empty());
     }
 
@@ -537,7 +541,8 @@ mod tests {
         let source = "const x = 1;";
         let tree = parse_js(source).unwrap();
         let mut cache = AstCache::new();
-        let violations = PipePropertyInit.check(source, Path::new("test.js"), &tree, &mut cache);
+        let config = crate::config::Config::default();
+        let violations = PipePropertyInit.check(source, Path::new("test.js"), &tree, &mut cache, &config);
         assert!(violations.is_empty());
     }
 }

@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use notify::{RecursiveMode, Watcher};
 
-use crate::{check, git};
+use crate::{check, config, git};
 
 /// Directories to ignore when watching for changes.
 const IGNORED_DIRS: &[&str] = &["node_modules", "dist", "target", ".git"];
@@ -35,7 +35,8 @@ fn run_check() {
         }
     };
 
-    if let Err(e) = check::check_files(&files) {
+    let config = config::Config::load().unwrap_or_default();
+    if let Err(e) = check::check_files(&files, &config) {
         eprintln!("error: {e}");
     }
 }

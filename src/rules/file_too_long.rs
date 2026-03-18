@@ -19,7 +19,8 @@ impl Rule for FileTooLong {
         "https://github.com/jordin/diaper/blob/main/docs/rules/file-too-long.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, _tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, _tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        let points_per_bucket = config.rule_score("file-too-long", POINTS_PER_BUCKET);
         let line_count = source.lines().count() as u32;
 
         if line_count <= THRESHOLD {
@@ -33,7 +34,7 @@ impl Rule for FileTooLong {
             return vec![];
         }
 
-        let score = buckets * POINTS_PER_BUCKET;
+        let score = buckets * points_per_bucket;
 
         vec![RuleViolation {
             rule_name: self.name().to_string(),
@@ -56,7 +57,8 @@ mod tests {
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
         let mut cache = super::super::AstCache::new();
-        FileTooLong.check(source, Path::new("test.js"), &tree, &mut cache)
+        let config = crate::config::Config::default();
+        FileTooLong.check(source, Path::new("test.js"), &tree, &mut cache, &config)
     }
 
     #[test]
