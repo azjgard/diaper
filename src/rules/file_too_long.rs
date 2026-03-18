@@ -19,7 +19,7 @@ impl Rule for FileTooLong {
         "https://github.com/jordin/diaper/blob/main/docs/rules/file-too-long.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, _tree: &tree_sitter::Tree) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, _tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
         let line_count = source.lines().count() as u32;
 
         if line_count <= THRESHOLD {
@@ -55,7 +55,8 @@ mod tests {
 
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
-        FileTooLong.check(source, Path::new("test.js"), &tree)
+        let mut cache = super::super::AstCache::new();
+        FileTooLong.check(source, Path::new("test.js"), &tree, &mut cache)
     }
 
     #[test]

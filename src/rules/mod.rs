@@ -1,10 +1,13 @@
 pub mod async_await;
 pub mod file_too_long;
 pub mod non_default_export;
+pub mod pipe_property_init;
 pub mod ternary_operator;
 pub mod upward_relative_import;
 
-use std::path::Path;
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// A single violation found by a rule.
 pub struct RuleViolation {
@@ -28,8 +31,9 @@ pub trait Rule {
 
     /// Score the given file. Returns zero or more violations.
     /// `source` is the file contents, `path` is the file path,
-    /// `tree` is the tree-sitter parse tree for the file.
-    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation>;
+    /// `tree` is the tree-sitter parse tree for the file,
+    /// `cache` allows rules to parse and access other files' ASTs on demand.
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache) -> Vec<RuleViolation>;
 }
 
 /// Parse JavaScript source into a tree-sitter tree.
@@ -39,12 +43,46 @@ pub fn parse_js(source: &str) -> Option<tree_sitter::Tree> {
     parser.parse(source, None)
 }
 
+/// Cache of parsed JavaScript ASTs. Stores source + tree per file path.
+/// Rules can use this to parse and access other files on demand.
+pub struct AstCache {
+    entries: HashMap<PathBuf, (String, tree_sitter::Tree)>,
+}
+
+impl AstCache {
+    pub fn new() -> Self {
+        AstCache {
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Pre-seed the cache with an already-parsed file.
+    pub fn insert(&mut self, path: PathBuf, source: String, tree: tree_sitter::Tree) {
+        self.entries.insert(path, (source, tree));
+    }
+
+    /// Get source + tree for a file, parsing and caching it on demand if needed.
+    /// Returns None if the file can't be read or parsed.
+    pub fn get_or_parse(&mut self, path: &Path) -> Option<&(String, tree_sitter::Tree)> {
+        let abs = fs::canonicalize(path).ok()?;
+
+        if !self.entries.contains_key(&abs) {
+            let source = fs::read_to_string(&abs).ok()?;
+            let tree = parse_js(&source)?;
+            self.entries.insert(abs.clone(), (source, tree));
+        }
+
+        self.entries.get(&abs)
+    }
+}
+
 /// Returns all registered rules.
 pub fn all_rules() -> Vec<Box<dyn Rule>> {
     vec![
         Box::new(async_await::AsyncAwait),
         Box::new(file_too_long::FileTooLong),
         Box::new(non_default_export::NonDefaultExport),
+        Box::new(pipe_property_init::PipePropertyInit),
         Box::new(ternary_operator::TernaryOperator),
         Box::new(upward_relative_import::UpwardRelativeImport),
     ]
@@ -85,5 +123,46 @@ mod tests {
     fn test_parse_js_empty() {
         let tree = parse_js("");
         assert!(tree.is_some());
+    }
+
+    #[test]
+    fn test_ast_cache_new() {
+        let cache = AstCache::new();
+        assert!(cache.entries.is_empty());
+    }
+
+    #[test]
+    fn test_ast_cache_get_or_parse_missing_file() {
+        let mut cache = AstCache::new();
+        let result = cache.get_or_parse(Path::new("/tmp/nonexistent_diaper_cache_test.js"));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_ast_cache_insert_and_retrieve() {
+        let mut cache = AstCache::new();
+        let source = "const x = 1;".to_string();
+        let tree = parse_js(&source).unwrap();
+        let path = PathBuf::from("/tmp/test_cache_insert.js");
+        cache.insert(path.clone(), source, tree);
+        assert!(cache.entries.contains_key(&path));
+    }
+
+    #[test]
+    fn test_ast_cache_caches_on_reparse() {
+        let mut cache = AstCache::new();
+        // Write a temp file
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test.js");
+        fs::write(&file_path, "const x = 1;").unwrap();
+
+        // First call parses
+        let result1 = cache.get_or_parse(&file_path);
+        assert!(result1.is_some());
+
+        // Second call hits cache (same pointer = same entry)
+        let result2 = cache.get_or_parse(&file_path);
+        assert!(result2.is_some());
+        assert_eq!(result2.unwrap().0, "const x = 1;");
     }
 }

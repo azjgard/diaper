@@ -18,7 +18,7 @@ impl Rule for UpwardRelativeImport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/upward-relative-import.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
         let mut violations = Vec::new();
         collect_imports(tree.root_node(), source, &mut violations, self);
         violations
@@ -112,7 +112,8 @@ mod tests {
 
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
-        UpwardRelativeImport.check(source, Path::new("src/foo.js"), &tree)
+        let mut cache = super::super::AstCache::new();
+        UpwardRelativeImport.check(source, Path::new("src/foo.js"), &tree, &mut cache)
     }
 
     // --- Violations (should produce stink) ---

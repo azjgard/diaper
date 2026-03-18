@@ -18,7 +18,7 @@ impl Rule for TernaryOperator {
         "https://github.com/jordin/diaper/blob/main/docs/rules/ternary-operator.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
         let mut violations = Vec::new();
         let mut visited = Vec::new();
 
@@ -123,7 +123,8 @@ mod tests {
 
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
-        TernaryOperator.check(source, Path::new("src/foo.js"), &tree)
+        let mut cache = super::super::AstCache::new();
+        TernaryOperator.check(source, Path::new("src/foo.js"), &tree, &mut cache)
     }
 
     // --- Single ternary ---

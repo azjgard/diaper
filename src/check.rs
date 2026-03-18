@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::rules::{self, RuleViolation};
+use crate::rules::{self, AstCache, RuleViolation};
 
 // ANSI color codes
 const RED: &str = "\x1b[31m";
@@ -58,19 +58,25 @@ pub fn tier_for_score(score: u32) -> Tier {
 }
 
 /// Check a single file against all rules.
-pub fn check_file(path: &str) -> Result<FileResult, String> {
+pub fn check_file(path: &str, cache: &mut AstCache) -> Result<FileResult, String> {
     let source = fs::read_to_string(path)
         .map_err(|e| format!("failed to read {path}: {e}"))?;
 
     let tree = rules::parse_js(&source)
         .ok_or_else(|| format!("failed to parse {path}"))?;
 
-    let rules = rules::all_rules();
     let file_path = Path::new(path);
+
+    // Pre-seed cache with this file's already-parsed tree
+    if let Ok(abs) = fs::canonicalize(file_path) {
+        cache.insert(abs, source.clone(), tree.clone());
+    }
+
+    let rules = rules::all_rules();
 
     let mut violations = Vec::new();
     for rule in &rules {
-        let mut rule_violations = rule.check(&source, file_path, &tree);
+        let mut rule_violations = rule.check(&source, file_path, &tree, cache);
         violations.append(&mut rule_violations);
     }
 
@@ -100,10 +106,11 @@ pub fn check_files(paths: &[String]) -> Result<(), String> {
         return Ok(());
     }
 
+    let mut cache = AstCache::new();
     let mut any_smells = false;
 
     for path in &js_paths {
-        let result = check_file(path)?;
+        let result = check_file(path, &mut cache)?;
 
         if result.total_score > 0 {
             any_smells = true;
@@ -149,7 +156,8 @@ mod tests {
     #[test]
     fn test_check_file_short_file() {
         let file = create_temp_js_file("const x = 1;\n");
-        let result = check_file(file.path().to_str().unwrap()).unwrap();
+        let mut cache = AstCache::new();
+        let result = check_file(file.path().to_str().unwrap(), &mut cache).unwrap();
         assert_eq!(result.total_score, 0);
         assert!(result.violations.is_empty());
     }
@@ -158,14 +166,16 @@ mod tests {
     fn test_check_file_long_file() {
         let source = make_js_source(300);
         let file = create_temp_js_file(&source);
-        let result = check_file(file.path().to_str().unwrap()).unwrap();
+        let mut cache = AstCache::new();
+        let result = check_file(file.path().to_str().unwrap(), &mut cache).unwrap();
         assert_eq!(result.total_score, 20);
         assert_eq!(result.violations.len(), 1);
     }
 
     #[test]
     fn test_check_file_nonexistent() {
-        let result = check_file("/tmp/nonexistent_diaper_test.js");
+        let mut cache = AstCache::new();
+        let result = check_file("/tmp/nonexistent_diaper_test.js", &mut cache);
         assert!(result.is_err());
     }
 

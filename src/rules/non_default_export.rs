@@ -17,7 +17,7 @@ impl Rule for NonDefaultExport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/non-default-export.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
         let mut violations = Vec::new();
         collect_named_exports(tree.root_node(), source, &mut violations, self);
         violations
@@ -109,7 +109,8 @@ mod tests {
 
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
-        NonDefaultExport.check(source, Path::new("src/foo.js"), &tree)
+        let mut cache = super::super::AstCache::new();
+        NonDefaultExport.check(source, Path::new("src/foo.js"), &tree, &mut cache)
     }
 
     // --- Violations ---

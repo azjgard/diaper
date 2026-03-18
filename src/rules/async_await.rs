@@ -17,7 +17,7 @@ impl Rule for AsyncAwait {
         "https://github.com/jordin/diaper/blob/main/docs/rules/async-await.md"
     }
 
-    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache) -> Vec<RuleViolation> {
         let path_str = path.to_string_lossy();
 
         // Skip index.spec.js files
@@ -92,12 +92,14 @@ mod tests {
 
     fn check(source: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
-        AsyncAwait.check(source, Path::new("src/foo.js"), &tree)
+        let mut cache = super::super::AstCache::new();
+        AsyncAwait.check(source, Path::new("src/foo.js"), &tree, &mut cache)
     }
 
     fn check_with_path(source: &str, path: &str) -> Vec<RuleViolation> {
         let tree = parse_js(source).unwrap();
-        AsyncAwait.check(source, Path::new(path), &tree)
+        let mut cache = super::super::AstCache::new();
+        AsyncAwait.check(source, Path::new(path), &tree, &mut cache)
     }
 
     // --- Violations ---
