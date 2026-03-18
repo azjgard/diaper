@@ -18,6 +18,9 @@ enum Commands {
     Check {
         /// File path to check (if omitted, checks unstaged git changes)
         path: Option<String>,
+        /// Output results as JSON
+        #[arg(long)]
+        json: bool,
     },
     /// Watch for file changes and re-run checks
     Watch,
@@ -27,7 +30,7 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Check { path } => {
+        Commands::Check { path, json } => {
             let files = match path {
                 Some(p) => vec![p],
                 None => match git::unstaged_changed_files() {
@@ -39,7 +42,13 @@ fn main() {
                 },
             };
 
-            if let Err(e) = check::check_files(&files) {
+            let result = if json {
+                check::check_files_json(&files)
+            } else {
+                check::check_files(&files)
+            };
+
+            if let Err(e) = result {
                 eprintln!("error: {e}");
                 std::process::exit(1);
             }

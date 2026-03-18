@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::Path;
 
+use serde::Serialize;
+
 use crate::rules::{self, AstCache, RuleViolation};
 
 // ANSI color codes
@@ -131,6 +133,56 @@ pub fn check_files(paths: &[String]) -> Result<(), String> {
     if !any_smells {
         println!("{GREEN}All clean. ✅{RESET}");
     }
+
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct JsonFileResult {
+    path: String,
+    #[serde(rename = "stinkScore")]
+    stink_score: u32,
+    violations: Vec<JsonViolation>,
+}
+
+#[derive(Serialize)]
+struct JsonViolation {
+    rule: String,
+    #[serde(rename = "stinkScore")]
+    stink_score: u32,
+    description: String,
+    reference: String,
+}
+
+/// Check multiple files and print results as JSON.
+pub fn check_files_json(paths: &[String]) -> Result<(), String> {
+    let js_paths: Vec<&String> = paths.iter()
+        .filter(|p| p.ends_with(".js"))
+        .collect();
+
+    let mut cache = AstCache::new();
+    let mut results: Vec<JsonFileResult> = Vec::new();
+
+    for path in &js_paths {
+        let result = check_file(path, &mut cache)?;
+
+        if result.total_score > 0 {
+            results.push(JsonFileResult {
+                path: result.path,
+                stink_score: result.total_score,
+                violations: result.violations.into_iter().map(|v| JsonViolation {
+                    rule: v.rule_name,
+                    stink_score: v.score,
+                    description: v.message,
+                    reference: v.doc_url,
+                }).collect(),
+            });
+        }
+    }
+
+    let json = serde_json::to_string_pretty(&results)
+        .map_err(|e| format!("failed to serialize JSON: {e}"))?;
+    println!("{json}");
 
     Ok(())
 }
