@@ -27,6 +27,10 @@ impl Rule for PipePropertyInit {
     }
 
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let score = config.rule_score("pipe-property-init", SCORE_PER_VIOLATION);
         // Step 1: Is this a pipe flow function?
         let ctx_props = match find_ctx_spread_properties(tree.root_node(), source) {
