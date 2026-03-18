@@ -19,10 +19,10 @@ pub struct Config {
 }
 
 /// Default tier thresholds.
-pub const DEFAULT_FRESH_BABY_MIN: u32 = 0;
-pub const DEFAULT_LOADED_MIN: u32 = 31;
-pub const DEFAULT_BLOWOUT_MIN: u32 = 71;
-pub const DEFAULT_SOILED_MIN: u32 = 100;
+pub const DEFAULT_DAMP_MIN: u32 = 0;
+pub const DEFAULT_WET_MIN: u32 = 31;
+pub const DEFAULT_SOILED_MIN: u32 = 71;
+pub const DEFAULT_BLOWOUT_MIN: u32 = 100;
 
 /// Default rule scores.
 pub const DEFAULT_ASYNC_AWAIT: u32 = 100;
@@ -79,10 +79,10 @@ rules:
   pipe-property-init: {DEFAULT_PIPE_PROPERTY_INIT}
 
 levels:
-  fresh-baby: {DEFAULT_FRESH_BABY_MIN}
-  loaded: {DEFAULT_LOADED_MIN}
-  blowout: {DEFAULT_BLOWOUT_MIN}
+  damp: {DEFAULT_DAMP_MIN}
+  wet: {DEFAULT_WET_MIN}
   soiled: {DEFAULT_SOILED_MIN}
+  blowout: {DEFAULT_BLOWOUT_MIN}
 "#
     )
 }
@@ -185,10 +185,10 @@ levels:
     #[test]
     fn test_generate_default_config_contains_all_levels() {
         let content = generate_default_config();
-        assert!(content.contains("fresh-baby:"));
-        assert!(content.contains("loaded:"));
-        assert!(content.contains("blowout:"));
+        assert!(content.contains("damp:"));
+        assert!(content.contains("wet:"));
         assert!(content.contains("soiled:"));
+        assert!(content.contains("blowout:"));
     }
 
     #[test]

@@ -32,36 +32,36 @@ pub struct Tier {
 
 /// Get the tier for a given stink score, using config for level thresholds.
 pub fn tier_for_score(score: u32, config: &Config) -> Tier {
-    let soiled_min = config.level_min("soiled", config::DEFAULT_SOILED_MIN);
     let blowout_min = config.level_min("blowout", config::DEFAULT_BLOWOUT_MIN);
-    let loaded_min = config.level_min("loaded", config::DEFAULT_LOADED_MIN);
+    let soiled_min = config.level_min("soiled", config::DEFAULT_SOILED_MIN);
+    let wet_min = config.level_min("wet", config::DEFAULT_WET_MIN);
 
-    if score >= soiled_min {
+    if score >= blowout_min {
         Tier {
             emoji: "💩",
-            name: "SOILED",
-            message: "SOILED. Must change.",
+            name: "BLOWOUT",
+            message: "BLOWOUT. Must change.",
             color: RED,
         }
-    } else if score >= blowout_min {
+    } else if score >= soiled_min {
         Tier {
             emoji: "🧨",
-            name: "Blowout Warning",
+            name: "Soiled",
             message: "Don't leave this too long or you'll get a rash",
             color: ORANGE,
         }
-    } else if score >= loaded_min {
+    } else if score >= wet_min {
         Tier {
             emoji: "💪",
-            name: "Loaded",
+            name: "Wet",
             message: "A little dirty, but sometimes a little dirt in the diaper is worth it.",
             color: YELLOW,
         }
     } else {
         Tier {
             emoji: "👶",
-            name: "Fresh Baby",
-            message: "Squeaky clean.",
+            name: "Damp",
+            message: "Barely noticeable.",
             color: GREEN,
         }
     }
@@ -276,60 +276,60 @@ mod tests {
     // --- Tier tests ---
 
     #[test]
-    fn test_tier_zero() {
+    fn test_tier_damp() {
         let c = default_config();
         let tier = tier_for_score(0, &c);
         assert_eq!(tier.emoji, "👶");
-        assert_eq!(tier.name, "Fresh Baby");
+        assert_eq!(tier.name, "Damp");
     }
 
     #[test]
-    fn test_tier_squeaky_clean_boundary() {
+    fn test_tier_damp_boundary() {
         let c = default_config();
         let tier = tier_for_score(30, &c);
         assert_eq!(tier.emoji, "👶");
     }
 
     #[test]
-    fn test_tier_loaded_low() {
+    fn test_tier_wet_low() {
         let c = default_config();
         let tier = tier_for_score(31, &c);
         assert_eq!(tier.emoji, "💪");
-        assert_eq!(tier.name, "Loaded");
+        assert_eq!(tier.name, "Wet");
     }
 
     #[test]
-    fn test_tier_loaded_high() {
+    fn test_tier_wet_high() {
         let c = default_config();
         let tier = tier_for_score(70, &c);
         assert_eq!(tier.emoji, "💪");
     }
 
     #[test]
-    fn test_tier_blowout_low() {
+    fn test_tier_soiled_low() {
         let c = default_config();
         let tier = tier_for_score(71, &c);
         assert_eq!(tier.emoji, "🧨");
-        assert_eq!(tier.name, "Blowout Warning");
+        assert_eq!(tier.name, "Soiled");
     }
 
     #[test]
-    fn test_tier_blowout_high() {
+    fn test_tier_soiled_high() {
         let c = default_config();
         let tier = tier_for_score(99, &c);
         assert_eq!(tier.emoji, "🧨");
     }
 
     #[test]
-    fn test_tier_soiled_exact() {
+    fn test_tier_blowout_exact() {
         let c = default_config();
         let tier = tier_for_score(100, &c);
         assert_eq!(tier.emoji, "💩");
-        assert_eq!(tier.name, "SOILED");
+        assert_eq!(tier.name, "BLOWOUT");
     }
 
     #[test]
-    fn test_tier_soiled_high() {
+    fn test_tier_blowout_high() {
         let c = default_config();
         let tier = tier_for_score(500, &c);
         assert_eq!(tier.emoji, "💩");
