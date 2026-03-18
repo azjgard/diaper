@@ -5,6 +5,7 @@ pub mod non_default_export;
 pub mod non_idempotent_migration;
 pub mod pipe_property_init;
 pub mod ternary_operator;
+pub mod unsorted_string_array;
 pub mod upward_relative_import;
 
 use std::collections::HashMap;
@@ -92,6 +93,7 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(non_idempotent_migration::NonIdempotentMigration),
         Box::new(pipe_property_init::PipePropertyInit),
         Box::new(ternary_operator::TernaryOperator),
+        Box::new(unsorted_string_array::UnsortedStringArray),
         Box::new(upward_relative_import::UpwardRelativeImport),
     ]
 }
