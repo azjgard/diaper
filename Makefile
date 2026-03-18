@@ -1,4 +1,4 @@
-.PHONY: build test run check watch
+.PHONY: build test run check watch release
 
 build:
 	cargo build
@@ -14,3 +14,6 @@ check:
 
 watch:
 	cargo run -- watch
+
+release:
+	cargo build --release
