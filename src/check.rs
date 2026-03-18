@@ -105,15 +105,15 @@ fn hyperlink(url: &str, text: &str) -> String {
     format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
 }
 
-/// Check multiple files and print results.
-pub fn check_files(paths: &[String], config: &Config) -> Result<(), String> {
+/// Check multiple files and print results. Returns true if any smells were found.
+pub fn check_files(paths: &[String], config: &Config) -> Result<bool, String> {
     let js_paths: Vec<&String> = paths.iter()
         .filter(|p| p.ends_with(".js"))
         .collect();
 
     if js_paths.is_empty() {
         println!("{DIM}no JavaScript files to check{RESET}");
-        return Ok(());
+        return Ok(false);
     }
 
     let mut cache = AstCache::new();
@@ -142,7 +142,7 @@ pub fn check_files(paths: &[String], config: &Config) -> Result<(), String> {
         println!("{GREEN}All clean. ✅{RESET}");
     }
 
-    Ok(())
+    Ok(any_smells)
 }
 
 #[derive(Serialize)]
@@ -163,8 +163,8 @@ struct JsonViolation {
     reference: String,
 }
 
-/// Check multiple files and print results as JSON.
-pub fn check_files_json(paths: &[String], config: &Config) -> Result<(), String> {
+/// Check multiple files and print results as JSON. Returns true if any smells were found.
+pub fn check_files_json(paths: &[String], config: &Config) -> Result<bool, String> {
     let js_paths: Vec<&String> = paths.iter()
         .filter(|p| p.ends_with(".js"))
         .collect();
@@ -189,11 +189,13 @@ pub fn check_files_json(paths: &[String], config: &Config) -> Result<(), String>
         }
     }
 
+    let has_smells = !results.is_empty();
+
     let json = serde_json::to_string_pretty(&results)
         .map_err(|e| format!("failed to serialize JSON: {e}"))?;
     println!("{json}");
 
-    Ok(())
+    Ok(has_smells)
 }
 
 #[cfg(test)]

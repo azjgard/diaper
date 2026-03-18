@@ -59,9 +59,16 @@ fn main() {
                 check::check_files(&files, &config)
             };
 
-            if let Err(e) = result {
-                eprintln!("error: {e}");
-                std::process::exit(1);
+            match result {
+                Ok(has_smells) => {
+                    if has_smells {
+                        std::process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    std::process::exit(1);
+                }
             }
         }
         Commands::Watch => {

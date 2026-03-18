@@ -36,7 +36,7 @@ fn run_check() {
     };
 
     let config = config::Config::load().unwrap_or_default();
-    if let Err(e) = check::check_files(&files, &config) {
+    if let Err(e) = check::check_files(&files, &config).map(|_| ()) {
         eprintln!("error: {e}");
     }
 }
