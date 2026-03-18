@@ -75,7 +75,7 @@ fn find_non_default_graphql_types(
                                     doc_url: rule.doc_url().to_string(),
                                     score,
                                     code_sample: line.trim().to_string(),
-                                    fix_suggestion: format!("inline {var_name} into the default export or move it to its own type file"),
+                                    fix_suggestion: format!("move {var_name} to its own type file"),
                                 });
                             }
                         }
@@ -262,7 +262,7 @@ export default new ObjectType({ name: "Main" });
         let source = r#"const MyHelper = new ObjectType({ name: "MyHelper" });"#;
         let violations = check(source);
         assert!(violations[0].fix_suggestion.contains("MyHelper"));
-        assert!(violations[0].fix_suggestion.contains("inline"));
+        assert!(violations[0].fix_suggestion.contains("type file"));
     }
 
     // --- Metadata ---
