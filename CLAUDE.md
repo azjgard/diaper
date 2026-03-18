@@ -17,6 +17,10 @@ A fast CLI tool for parsing JavaScript files, built with Rust and tree-sitter.
 - **Be comprehensive in testing.** Too many tests >> too few tests. Test happy paths, edge cases, error cases, and boundary conditions.
 - **Commit and summarize after finishing every batch of changes.**
 
+## Creating Rules
+
+See [RULE_CREATION_INSTRUCTIONS.md](RULE_CREATION_INSTRUCTIONS.md) for step-by-step instructions on creating new rules, including file structure, conventions, registration, testing requirements, and a checklist.
+
 ## Tech Stack
 
 - Rust
