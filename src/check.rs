@@ -40,28 +40,28 @@ pub fn tier_for_score(score: u32, config: &Config) -> Tier {
         Tier {
             emoji: "💩",
             name: "BLOWOUT",
-            message: "BLOWOUT. Must change.",
+            message: "Game over. The couch is ruined.",
             color: RED,
         }
     } else if score >= soiled_min {
         Tier {
             emoji: "🤢",
             name: "Soiled",
-            message: "Don't leave this too long or you'll get a rash",
+            message: "You should probably change this -- rash imminent.",
             color: ORANGE,
         }
     } else if score >= wet_min {
         Tier {
             emoji: "💦",
             name: "Wet",
-            message: "A little dirty, but sometimes a little dirt in the diaper is worth it.",
+            message: "A little dirty, but this is what diapers are made for.",
             color: YELLOW,
         }
     } else {
         Tier {
             emoji: "💧",
             name: "Damp",
-            message: "Barely noticeable.",
+            message: "Basically dry!",
             color: GREEN,
         }
     }
