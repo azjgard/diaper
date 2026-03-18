@@ -59,6 +59,7 @@ pub const DEFAULT_BLOWOUT_MIN: u32 = 100;
 pub const DEFAULT_ASYNC_AWAIT: u32 = 100;
 pub const DEFAULT_CTX_DESTRUCTURE: u32 = 10;
 pub const DEFAULT_FILE_TOO_LONG: u32 = 10;
+pub const DEFAULT_GRAPHQL_TYPE_EXPORT: u32 = 100;
 pub const DEFAULT_NON_DEFAULT_EXPORT: u32 = 50;
 pub const DEFAULT_NON_IDEMPOTENT_MIGRATION: u32 = 50;
 pub const DEFAULT_TERNARY_SINGLE: u32 = 10;
@@ -126,6 +127,7 @@ rules:
   async-await: {DEFAULT_ASYNC_AWAIT}
   ctx-destructure: {DEFAULT_CTX_DESTRUCTURE}
   file-too-long: {DEFAULT_FILE_TOO_LONG}
+  graphql-type-export: {DEFAULT_GRAPHQL_TYPE_EXPORT}
   non-default-export: {DEFAULT_NON_DEFAULT_EXPORT}
   non-idempotent-migration: {DEFAULT_NON_IDEMPOTENT_MIGRATION}
   ternary-single: {DEFAULT_TERNARY_SINGLE}
