@@ -1,4 +1,5 @@
 pub mod async_await;
+pub mod ctx_destructure;
 pub mod file_too_long;
 pub mod non_default_export;
 pub mod pipe_property_init;
@@ -84,6 +85,7 @@ impl AstCache {
 pub fn all_rules() -> Vec<Box<dyn Rule>> {
     vec![
         Box::new(async_await::AsyncAwait),
+        Box::new(ctx_destructure::CtxDestructure),
         Box::new(file_too_long::FileTooLong),
         Box::new(non_default_export::NonDefaultExport),
         Box::new(pipe_property_init::PipePropertyInit),
