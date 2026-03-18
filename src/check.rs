@@ -7,10 +7,10 @@ use crate::config::{self, Config};
 use crate::rules::{self, AstCache, RuleViolation};
 
 // ANSI color codes
-const RED: &str = "\x1b[31m";
-const YELLOW: &str = "\x1b[33m";
 const GREEN: &str = "\x1b[32m";
-const BRIGHT_RED: &str = "\x1b[91m";
+const YELLOW: &str = "\x1b[33m";
+const ORANGE: &str = "\x1b[38;5;208m";
+const RED: &str = "\x1b[31m";
 const DIM: &str = "\x1b[2m";
 const BOLD: &str = "\x1b[1m";
 const RESET: &str = "\x1b[0m";
@@ -41,14 +41,14 @@ pub fn tier_for_score(score: u32, config: &Config) -> Tier {
             emoji: "💩",
             name: "SOILED",
             message: "SOILED. Must change.",
-            color: BRIGHT_RED,
+            color: RED,
         }
     } else if score >= blowout_min {
         Tier {
             emoji: "🧨",
             name: "Blowout Warning",
             message: "Don't leave this too long or you'll get a rash",
-            color: RED,
+            color: ORANGE,
         }
     } else if score >= loaded_min {
         Tier {
@@ -340,7 +340,7 @@ mod tests {
         let c = default_config();
         assert_eq!(tier_for_score(0, &c).color, GREEN);
         assert_eq!(tier_for_score(50, &c).color, YELLOW);
-        assert_eq!(tier_for_score(80, &c).color, RED);
-        assert_eq!(tier_for_score(100, &c).color, BRIGHT_RED);
+        assert_eq!(tier_for_score(80, &c).color, ORANGE);
+        assert_eq!(tier_for_score(100, &c).color, RED);
     }
 }
