@@ -16,6 +16,7 @@ A fast CLI tool for parsing JavaScript files, built with Rust and tree-sitter.
 - **Always run `cargo build` after changes to confirm it compiles.** Never skip this.
 - **Be comprehensive in testing.** Too many tests >> too few tests. Test happy paths, edge cases, error cases, and boundary conditions.
 - **Commit and summarize after finishing every batch of changes.**
+- **Push to remote after committing.** Always `git push` after a commit.
 
 ## Creating Rules
 
