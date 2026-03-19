@@ -57,6 +57,7 @@ pub const DEFAULT_BLOWOUT_MIN: u32 = 100;
 
 /// Default rule scores.
 pub const DEFAULT_ASYNC_AWAIT: u32 = 100;
+pub const DEFAULT_ASYNC_PROMISE_RETURN: u32 = 15;
 pub const DEFAULT_CTX_DESTRUCTURE: u32 = 10;
 pub const DEFAULT_FILE_TOO_LONG: u32 = 10;
 pub const DEFAULT_GRAPHQL_TYPE_EXPORT: u32 = 100;
@@ -125,6 +126,7 @@ pub fn generate_default_config() -> String {
 
 rules:
   async-await: {DEFAULT_ASYNC_AWAIT}
+  async-promise-return: {DEFAULT_ASYNC_PROMISE_RETURN}
   ctx-destructure: {DEFAULT_CTX_DESTRUCTURE}
   file-too-long: {DEFAULT_FILE_TOO_LONG}
   graphql-type-export: {DEFAULT_GRAPHQL_TYPE_EXPORT}
