@@ -28,7 +28,7 @@ enum Commands {
     Watch,
     /// Generate a default diaper.yml config file
     Init,
-    /// Install Claude Code stop hook for diaper
+    /// Install Claude Code stop hook (blocks Claude on violations, use with claude --dangerously-skip-permissions)
     InstallHook,
 }
 

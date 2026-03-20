@@ -81,3 +81,10 @@ else
   echo ""
   echo "Then run 'diaper check' to get started."
 fi
+
+echo ""
+echo "To install the Claude Code stop hook:"
+echo "  diaper install-hook"
+echo ""
+echo "For the best experience, run Claude in bypass permissions mode:"
+echo "  claude --dangerously-skip-permissions"
