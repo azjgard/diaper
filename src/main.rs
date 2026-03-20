@@ -1,6 +1,7 @@
 mod check;
 mod config;
 mod git;
+mod hook;
 mod rules;
 mod watch;
 
@@ -27,6 +28,8 @@ enum Commands {
     Watch,
     /// Generate a default diaper.yml config file
     Init,
+    /// Install Claude Code stop hook for diaper
+    InstallHook,
 }
 
 fn main() {
@@ -79,6 +82,12 @@ fn main() {
         }
         Commands::Init => {
             if let Err(e) = config::init_config() {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        }
+        Commands::InstallHook => {
+            if let Err(e) = hook::install_hook() {
                 eprintln!("error: {e}");
                 std::process::exit(1);
             }
