@@ -68,6 +68,7 @@ pub const DEFAULT_TERNARY_NESTED: u32 = 60;
 pub const DEFAULT_UNSORTED_STRING_ARRAY: u32 = 5;
 pub const DEFAULT_UPWARD_RELATIVE_IMPORT: u32 = 100;
 pub const DEFAULT_PIPE_PROPERTY_INIT: u32 = 100;
+pub const DEFAULT_REQUIRE_QUERY_ATTRIBUTES: u32 = 10;
 
 impl Config {
     /// Load config from diaper.yml in the current directory.
@@ -137,6 +138,7 @@ rules:
   unsorted-string-array: {DEFAULT_UNSORTED_STRING_ARRAY}
   upward-relative-import: {DEFAULT_UPWARD_RELATIVE_IMPORT}
   pipe-property-init: {DEFAULT_PIPE_PROPERTY_INIT}
+  require-query-attributes: {DEFAULT_REQUIRE_QUERY_ATTRIBUTES}
 
 levels:
   damp: {DEFAULT_DAMP_MIN}
