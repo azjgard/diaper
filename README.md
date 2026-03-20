@@ -68,9 +68,9 @@ src/api/handler.js  BLOWOUT 💩 (340)
   +100  upward-relative-import  import ... from "../../core/db"
     use an alias or move the import to a shared module instead of "../../core/db"
     ./docs/rules/upward-relative-import.md
-  +10   ternary-operator  const x = a ? b : c;
-    replace ternary with if/else for readability
-    https://github.com/jordin/diaper/blob/main/docs/rules/ternary-operator.md
+  +60   nested-ternary  const x = a ? b ? c : d : e;
+    extract nested ternary (2 levels) into a sub-function with early returns for each branch
+    https://github.com/jordin/diaper/blob/main/docs/rules/nested-ternary.md
   +30   file-too-long  430 lines
     split file into smaller modules (currently 430 lines, threshold 200)
     https://github.com/jordin/diaper/blob/main/docs/rules/file-too-long.md
@@ -107,7 +107,7 @@ Each violation shows: score, rule name, code sample, fix suggestion (green), and
 | `reduce-param-name` | 70 per call | `.reduce()` callback first param not named `prevVal` |
 | `require-query-attributes` | 10 per query | Sequelize queries missing explicit `attributes` |
 | `short-iter-param` | 15 per call | `.forEach`/`.map`/`.filter`/`.reduce` callback item param 3 chars or less |
-| `ternary-operator` | 10 single / 60 nested | Ternary expressions, with higher penalty for nesting |
+| `nested-ternary` | 60 per nested ternary | Nested ternary expressions (2+ levels deep) |
 | `unsorted-string-array` | 5 per array | String arrays not in alphabetical order |
 | `upward-relative-import` | 100 per import | Imports using `../` paths (unless path contains "shared") |
 
@@ -130,7 +130,6 @@ rules:
   reduce-param-name: 70
   require-query-attributes: 10
   short-iter-param: 15
-  ternary-single: 10
   ternary-nested: 60
   unsorted-string-array: 5
   upward-relative-import: 100

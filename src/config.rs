@@ -63,7 +63,6 @@ pub const DEFAULT_FILE_TOO_LONG: u32 = 10;
 pub const DEFAULT_GRAPHQL_TYPE_EXPORT: u32 = 100;
 pub const DEFAULT_NON_DEFAULT_EXPORT: u32 = 50;
 pub const DEFAULT_NON_IDEMPOTENT_MIGRATION: u32 = 50;
-pub const DEFAULT_TERNARY_SINGLE: u32 = 10;
 pub const DEFAULT_TERNARY_NESTED: u32 = 60;
 pub const DEFAULT_UNSORTED_STRING_ARRAY: u32 = 5;
 pub const DEFAULT_SQL_TABLE_ALIAS: u32 = 100;
@@ -136,7 +135,6 @@ rules:
   graphql-type-export: {DEFAULT_GRAPHQL_TYPE_EXPORT}
   non-default-export: {DEFAULT_NON_DEFAULT_EXPORT}
   non-idempotent-migration: {DEFAULT_NON_IDEMPOTENT_MIGRATION}
-  ternary-single: {DEFAULT_TERNARY_SINGLE}
   ternary-nested: {DEFAULT_TERNARY_NESTED}
   unsorted-string-array: {DEFAULT_UNSORTED_STRING_ARRAY}
   upward-relative-import: {DEFAULT_UPWARD_RELATIVE_IMPORT}
@@ -316,7 +314,6 @@ rules:
         assert!(content.contains("async-await:"));
         assert!(content.contains("file-too-long:"));
         assert!(content.contains("non-default-export:"));
-        assert!(content.contains("ternary-single:"));
         assert!(content.contains("ternary-nested:"));
         assert!(content.contains("upward-relative-import:"));
         assert!(content.contains("pipe-property-init:"));

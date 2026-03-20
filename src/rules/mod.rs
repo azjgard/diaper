@@ -9,8 +9,8 @@ pub mod pipe_property_init;
 pub mod reduce_param_name;
 pub mod require_query_attributes;
 pub mod short_iter_param;
+pub mod nested_ternary;
 pub mod sql_table_alias;
-pub mod ternary_operator;
 pub mod unsorted_string_array;
 pub mod upward_relative_import;
 
@@ -116,8 +116,8 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(reduce_param_name::ReduceParamName),
         Box::new(require_query_attributes::RequireQueryAttributes),
         Box::new(short_iter_param::ShortIterParam),
+        Box::new(nested_ternary::NestedTernary),
         Box::new(sql_table_alias::SqlTableAlias),
-        Box::new(ternary_operator::TernaryOperator),
         Box::new(unsorted_string_array::UnsortedStringArray),
         Box::new(upward_relative_import::UpwardRelativeImport),
     ]

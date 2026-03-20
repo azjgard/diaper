@@ -2,20 +2,19 @@ use std::path::Path;
 
 use super::{Rule, RuleViolation};
 
-/// Rule: ternary operator usage adds stink.
-/// Single ternary: +10. Nested ternary: +60.
-pub struct TernaryOperator;
+/// Rule: nested ternary operators add stink.
+/// Only flags ternaries nested 2+ levels deep. Single ternaries are fine.
+pub struct NestedTernary;
 
-const SINGLE_SCORE: u32 = 10;
 const NESTED_SCORE: u32 = 60;
 
-impl Rule for TernaryOperator {
+impl Rule for NestedTernary {
     fn name(&self) -> &str {
-        "ternary-operator"
+        "nested-ternary"
     }
 
     fn doc_url(&self) -> &str {
-        "https://github.com/jordin/diaper/blob/main/docs/rules/ternary-operator.md"
+        "https://github.com/jordin/diaper/blob/main/docs/rules/nested-ternary.md"
     }
 
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
@@ -23,45 +22,35 @@ impl Rule for TernaryOperator {
             return vec![];
         }
 
-        let single_score = config.rule_score("ternary-single", SINGLE_SCORE);
         let nested_score = config.rule_score("ternary-nested", NESTED_SCORE);
         let mut violations = Vec::new();
         let mut visited = Vec::new();
 
-        collect_ternaries(tree.root_node(), source, &mut violations, &mut visited, self, single_score, nested_score);
+        collect_nested_ternaries(tree.root_node(), source, &mut violations, &mut visited, self, nested_score);
 
         violations
     }
 }
 
-fn collect_ternaries(
+fn collect_nested_ternaries(
     node: tree_sitter::Node,
     source: &str,
     violations: &mut Vec<RuleViolation>,
     visited: &mut Vec<usize>,
-    rule: &TernaryOperator,
-    single_score: u32,
+    rule: &NestedTernary,
     nested_score: u32,
 ) {
     if node.kind() == "ternary_expression" && !visited.contains(&node.id()) {
         let depth = count_ternary_depth(node);
-        let line = &source.lines().nth(node.start_position().row).unwrap_or("");
 
         if depth > 1 {
+            let line = &source.lines().nth(node.start_position().row).unwrap_or("");
             violations.push(RuleViolation {
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
                 score: nested_score,
                 code_sample: line.trim().to_string(),
                 fix_suggestion: format!("extract nested ternary ({depth} levels) into a sub-function with early returns for each branch"),
-            });
-        } else {
-            violations.push(RuleViolation {
-                rule_name: rule.name().to_string(),
-                doc_url: rule.doc_url().to_string(),
-                score: single_score,
-                code_sample: line.trim().to_string(),
-                fix_suggestion: "extract into a sub-function with early returns for each branch".to_string(),
             });
         }
 
@@ -72,7 +61,7 @@ fn collect_ternaries(
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_ternaries(child, source, violations, visited, rule, single_score, nested_score);
+        collect_nested_ternaries(child, source, violations, visited, rule, nested_score);
     }
 }
 
@@ -132,33 +121,50 @@ mod tests {
         let tree = parse_js(source).unwrap();
         let mut cache = super::super::AstCache::new();
         let config = crate::config::Config::default();
-        TernaryOperator.check(source, Path::new("src/foo.js"), &tree, &mut cache, &config)
+        NestedTernary.check(source, Path::new("src/foo.js"), &tree, &mut cache, &config)
     }
 
-    // --- Single ternary ---
+    // --- Single ternary (no violation) ---
 
     #[test]
-    fn test_simple_ternary() {
+    fn test_simple_ternary_no_violation() {
         let violations = check("const x = a ? b : c;");
-        assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 10);
+        assert!(violations.is_empty());
     }
 
     #[test]
-    fn test_ternary_in_assignment() {
+    fn test_ternary_in_assignment_no_violation() {
         let violations = check("const result = isReady ? 'yes' : 'no';");
-        assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 10);
+        assert!(violations.is_empty());
     }
 
     #[test]
-    fn test_ternary_in_return() {
+    fn test_ternary_in_return_no_violation() {
         let violations = check("return active ? doThis() : doThat();");
-        assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 10);
+        assert!(violations.is_empty());
     }
 
-    // --- Nested ternary (single line) ---
+    #[test]
+    fn test_multiline_single_ternary_no_violation() {
+        let source = "const x = condition\n  ? valueA\n  : valueB;";
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_ternary_with_optional_chaining_no_violation() {
+        let violations = check("const x = foo?.bar ? 'yes' : 'no';");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_two_separate_ternaries_no_violation() {
+        let source = "const a = x ? 1 : 2;\nconst b = y ? 3 : 4;";
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    // --- Nested ternary (violation) ---
 
     #[test]
     fn test_nested_ternary_single_line() {
@@ -182,8 +188,6 @@ mod tests {
         assert_eq!(violations[0].score, 60);
     }
 
-    // --- Nested ternary (multi-line) ---
-
     #[test]
     fn test_multiline_nested_ternary() {
         let source = r#"  const tern = true
@@ -198,30 +202,11 @@ mod tests {
     }
 
     #[test]
-    fn test_multiline_single_ternary() {
-        let source = "const x = condition\n  ? valueA\n  : valueB;";
-        let violations = check(source);
-        assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 10);
-    }
-
-    // --- Multiple separate ternaries ---
-
-    #[test]
-    fn test_two_separate_ternaries() {
-        let source = "const a = x ? 1 : 2;\nconst b = y ? 3 : 4;";
-        let violations = check(source);
-        assert_eq!(violations.len(), 2);
-        assert_eq!(violations.iter().map(|v| v.score).sum::<u32>(), 20);
-    }
-
-    #[test]
     fn test_mix_single_and_nested() {
         let source = "const a = x ? 1 : 2;\nconst b = x ? y ? 1 : 2 : 3;";
         let violations = check(source);
-        assert_eq!(violations.len(), 2);
-        assert_eq!(violations[0].score, 10);
-        assert_eq!(violations[1].score, 60);
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].score, 60);
     }
 
     // --- No violations ---
@@ -268,17 +253,6 @@ mod tests {
         assert!(violations.is_empty());
     }
 
-    // --- Mixed with optional chaining ---
-
-    #[test]
-    fn test_ternary_with_optional_chaining() {
-        let violations = check("const x = foo?.bar ? 'yes' : 'no';");
-        assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].score, 10);
-    }
-
-    // --- Ternary in comment should not count ---
-
     #[test]
     fn test_ternary_in_comment_not_counted() {
         let violations = check("// const x = a ? b : c;");
@@ -295,13 +269,13 @@ mod tests {
 
     #[test]
     fn test_violation_has_correct_rule_name() {
-        let violations = check("const x = a ? b : c;");
-        assert_eq!(violations[0].rule_name, "ternary-operator");
+        let violations = check("const x = a ? b ? c : d : e;");
+        assert_eq!(violations[0].rule_name, "nested-ternary");
     }
 
     #[test]
     fn test_violation_has_doc_url() {
-        let violations = check("const x = a ? b : c;");
+        let violations = check("const x = a ? b ? c : d : e;");
         assert!(violations[0].doc_url.starts_with("https://"));
     }
 }
