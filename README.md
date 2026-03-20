@@ -1,5 +1,7 @@
 # `[--diaper--]`
 
+> **Note:** diaper is currently in beta.
+
 A fast JavaScript code smell scorer built with Rust and tree-sitter. Think of it like ESLint, but focused on structural code smells and designed to help AI agents write better code without constant human babysitting.
 
 Instead of warnings and errors, diaper scores files with **stink points**. Each rule has a configurable score, a fix suggestion, and a documentation reference for agents to learn from.
