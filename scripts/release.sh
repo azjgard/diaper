@@ -9,6 +9,26 @@ fi
 
 VERSION="$1"
 
+# Find the previous tag for generating release notes
+PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+
+# Create local tag
+echo "Creating local tag ${VERSION}..."
+git tag "$VERSION"
+
+# Push tag to remote
+echo "Pushing tag ${VERSION} to remote..."
+git push origin "$VERSION"
+
+# Build release notes from commit log
+if [ -n "$PREV_TAG" ]; then
+  echo "Generating release notes from ${PREV_TAG}..${VERSION}..."
+  NOTES=$(git log --format="- %s" "${PREV_TAG}..${VERSION}")
+else
+  echo "No previous tag found, generating release notes from all commits..."
+  NOTES=$(git log --format="- %s" "$VERSION")
+fi
+
 echo "Building release binary..."
 make release
 
@@ -23,7 +43,7 @@ cp target/release/diaper "$TMPDIR/diaper"
 echo "Creating GitHub release ${VERSION}..."
 gh release create "$VERSION" \
   --title "$VERSION" \
-  --generate-notes \
+  --notes "$NOTES" \
   "${TMPDIR}/${ASSET}"
 
 echo ""
