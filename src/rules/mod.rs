@@ -6,7 +6,9 @@ pub mod graphql_type_export;
 pub mod non_default_export;
 pub mod non_idempotent_migration;
 pub mod pipe_property_init;
+pub mod reduce_param_name;
 pub mod require_query_attributes;
+pub mod short_iter_param;
 pub mod ternary_operator;
 pub mod unsorted_string_array;
 pub mod upward_relative_import;
@@ -110,7 +112,9 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(non_default_export::NonDefaultExport),
         Box::new(non_idempotent_migration::NonIdempotentMigration),
         Box::new(pipe_property_init::PipePropertyInit),
+        Box::new(reduce_param_name::ReduceParamName),
         Box::new(require_query_attributes::RequireQueryAttributes),
+        Box::new(short_iter_param::ShortIterParam),
         Box::new(ternary_operator::TernaryOperator),
         Box::new(unsorted_string_array::UnsortedStringArray),
         Box::new(upward_relative_import::UpwardRelativeImport),
