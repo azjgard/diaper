@@ -28,7 +28,7 @@ impl Rule for NestedTernary {
     fn examples(&self) -> (&[&str], &[&str]) {
         (
             &["const x = a ? b ? c : d : e;"],
-            &["const x = a ? b : c;"],
+            &["function getValue() {\n  if (a) return b;\n  if (c) return d;\n  return e;\n}"],
         )
     }
 
