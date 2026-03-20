@@ -39,22 +39,39 @@ echo "Pushing to remote..."
 git push
 git push origin "$TAG"
 
-echo "Building release binary..."
-make release
-
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# Create zip asset matching install.sh naming convention
-ASSET="diaper-darwin-arm64.zip"
+# Detect host architecture
+HOST_ARCH="$(uname -m)"
+case "$HOST_ARCH" in
+  arm64|aarch64) ARCH="arm64" ;;
+  x86_64)        ARCH="amd64" ;;
+  *)             echo "Unsupported architecture: $HOST_ARCH"; exit 1 ;;
+esac
+
+# Build macOS binary
+echo "Building macOS release binary..."
+make release
+
+DARWIN_ASSET="diaper-darwin-${ARCH}.zip"
 cp target/release/diaper "$TMPDIR/diaper"
-(cd "$TMPDIR" && zip "$ASSET" diaper)
+(cd "$TMPDIR" && zip "$DARWIN_ASSET" diaper && rm diaper)
+
+# Build Linux binary via Docker
+echo "Building Linux release binary..."
+make release-linux
+
+LINUX_ASSET="diaper-linux-${ARCH}.zip"
+cp target/linux-release/diaper "$TMPDIR/diaper"
+(cd "$TMPDIR" && zip "$LINUX_ASSET" diaper && rm diaper)
 
 echo "Creating GitHub release ${TAG}..."
 gh release create "$TAG" \
   --title "$TAG" \
   --notes "$NOTES" \
-  "${TMPDIR}/${ASSET}"
+  "${TMPDIR}/${DARWIN_ASSET}" \
+  "${TMPDIR}/${LINUX_ASSET}"
 
 echo ""
 echo "Release ${TAG} created: https://github.com/azjgard/diaper/releases/tag/${TAG}"
