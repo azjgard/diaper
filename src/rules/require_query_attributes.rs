@@ -30,8 +30,8 @@ impl Rule for RequireQueryAttributes {
 
     fn examples(&self) -> (&[&str], &[&str]) {
         (
-            &["Model.findAll({ where: { id } })"],
-            &["Model.findAll({ where: { id }, attributes: ['id', 'name'] })"],
+            &["Model.findAll({ order: [['name', 'desc']] })"],
+            &["Model.findAll({ order: [['name', 'desc']], attributes: ['id', 'name'] })"],
         )
     }
 
