@@ -30,6 +30,64 @@ enum Commands {
     Init,
     /// Install Claude Code stop hook (blocks Claude on violations, use with claude --dangerously-skip-permissions)
     InstallHook,
+    /// List all rules (or show details for a specific rule)
+    Rules {
+        /// Rule name to show details for
+        name: Option<String>,
+    },
+}
+
+const CYAN: &str = "\x1b[36m";
+const GREEN: &str = "\x1b[32m";
+const RED: &str = "\x1b[31m";
+const DIM: &str = "\x1b[2m";
+const BOLD: &str = "\x1b[1m";
+const RESET: &str = "\x1b[0m";
+
+fn print_rules_list() {
+    let all = rules::all_rules();
+    println!("{BOLD}diaper rules{RESET} ({} total)\n", all.len());
+    for rule in &all {
+        println!("  {CYAN}{}{RESET} {DIM}-{RESET} {}", rule.name(), rule.description());
+    }
+    println!("\n{DIM}Run 'diaper rules <name>' for details and examples.{RESET}");
+}
+
+fn print_rule_detail(name: &str) {
+    let all = rules::all_rules();
+    let rule = match all.iter().find(|r| r.name() == name) {
+        Some(r) => r,
+        None => {
+            eprintln!("error: unknown rule '{name}'");
+            eprintln!("Run 'diaper rules' to see all available rules.");
+            std::process::exit(1);
+        }
+    };
+
+    println!("{BOLD}{CYAN}{}{RESET}", rule.name());
+    println!("{}", rule.description());
+    println!("{DIM}score: {}{RESET}", rule.default_score());
+    println!("{DIM}{}{RESET}", rule.doc_url());
+
+    let (bad, good) = rule.examples();
+
+    if !bad.is_empty() {
+        println!("\n{RED}{BOLD}Bad:{RESET}");
+        for example in bad {
+            for line in example.lines() {
+                println!("  {RED}{line}{RESET}");
+            }
+        }
+    }
+
+    if !good.is_empty() {
+        println!("\n{GREEN}{BOLD}Good:{RESET}");
+        for example in good {
+            for line in example.lines() {
+                println!("  {GREEN}{line}{RESET}");
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -111,6 +169,12 @@ fn main() {
             if let Err(e) = hook::install_hook() {
                 eprintln!("error: {e}");
                 std::process::exit(1);
+            }
+        }
+        Commands::Rules { name } => {
+            match name {
+                Some(n) => print_rule_detail(&n),
+                None => print_rules_list(),
             }
         }
     }

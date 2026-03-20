@@ -27,6 +27,21 @@ impl Rule for ShortIterParam {
         "https://github.com/jordin/diaper/blob/main/docs/rules/short-iter-param.md"
     }
 
+    fn description(&self) -> &str {
+        "Iterator callback item param is 3 chars or less"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["items.map(x => x.id)", "items.forEach(el => el.save())"],
+            &["items.map(item => item.id)", "items.forEach(element => element.save())"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

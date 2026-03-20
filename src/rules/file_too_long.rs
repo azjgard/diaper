@@ -19,6 +19,21 @@ impl Rule for FileTooLong {
         "https://github.com/jordin/diaper/blob/main/docs/rules/file-too-long.md"
     }
 
+    fn description(&self) -> &str {
+        "Files over 200 lines accumulate stink (+10 per 50 lines over)"
+    }
+
+    fn default_score(&self) -> u32 {
+        POINTS_PER_BUCKET
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["// file with 300+ lines"],
+            &["// file under 200 lines"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, _tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

@@ -17,6 +17,21 @@ impl Rule for NestedTernary {
         "https://github.com/jordin/diaper/blob/main/docs/rules/nested-ternary.md"
     }
 
+    fn description(&self) -> &str {
+        "Nested ternary expressions (2+ levels deep)"
+    }
+
+    fn default_score(&self) -> u32 {
+        NESTED_SCORE
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["const x = a ? b ? c : d : e;"],
+            &["const x = a ? b : c;"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

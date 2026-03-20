@@ -20,6 +20,21 @@ impl Rule for RequireQueryAttributes {
         "https://github.com/jordin/diaper/blob/main/docs/rules/require-query-attributes.md"
     }
 
+    fn description(&self) -> &str {
+        "Sequelize queries missing explicit attributes"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["Model.findAll({ where: { id } })"],
+            &["Model.findAll({ where: { id }, attributes: ['id', 'name'] })"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

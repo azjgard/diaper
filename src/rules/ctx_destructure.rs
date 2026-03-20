@@ -18,6 +18,21 @@ impl Rule for CtxDestructure {
         "https://github.com/jordin/diaper/blob/main/docs/rules/ctx-destructure.md"
     }
 
+    fn description(&self) -> &str {
+        "Direct ctx.foo access instead of destructuring"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["const name = ctx.name;"],
+            &["const { name } = ctx;"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

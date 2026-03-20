@@ -16,6 +16,21 @@ impl Rule for UnsortedStringArray {
         "https://github.com/jordin/diaper/blob/main/docs/rules/unsorted-string-array.md"
     }
 
+    fn description(&self) -> &str {
+        "String arrays not in alphabetical order"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &[r#"["banana", "apple", "cherry"]"#],
+            &[r#"["apple", "banana", "cherry"]"#],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

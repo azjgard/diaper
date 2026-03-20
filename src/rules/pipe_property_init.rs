@@ -26,6 +26,21 @@ impl Rule for PipePropertyInit {
         "https://github.com/jordin/diaper/blob/main/docs/rules/pipe-property-init.md"
     }
 
+    fn description(&self) -> &str {
+        "Pipe flow properties not initialized in parent pipe call"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["ctx.newProp = value; // not in pipe init"],
+            &["// property initialized in parent pipe({...})"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

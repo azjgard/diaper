@@ -43,6 +43,16 @@ pub trait Rule {
     /// URL linking to documentation about this rule.
     fn doc_url(&self) -> &str;
 
+    /// One-line description of what this rule detects.
+    fn description(&self) -> &str;
+
+    /// Default stink score per violation.
+    fn default_score(&self) -> u32;
+
+    /// Code examples that trigger this rule (bad) and code that doesn't (good).
+    /// Returns (bad_examples, good_examples).
+    fn examples(&self) -> (&[&str], &[&str]);
+
     /// Score the given file. Returns zero or more violations.
     /// `source` is the file contents, `path` is the file path,
     /// `tree` is the tree-sitter parse tree for the file,

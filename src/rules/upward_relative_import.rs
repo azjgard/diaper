@@ -18,6 +18,21 @@ impl Rule for UpwardRelativeImport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/upward-relative-import.md"
     }
 
+    fn description(&self) -> &str {
+        "Imports using ../ paths (unless path contains \"shared\")"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["import db from \"../../core/db\""],
+            &["import db from \"#core/db\""],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

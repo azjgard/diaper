@@ -18,6 +18,21 @@ impl Rule for NonIdempotentMigration {
         "https://github.com/jordin/diaper/blob/main/docs/rules/non-idempotent-migration.md"
     }
 
+    fn description(&self) -> &str {
+        "addColumn/removeColumn in migrations (non-idempotent)"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["queryInterface.addColumn('users', 'email', ...)"],
+            &["// use a raw SQL migration instead"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         let path_str = path.to_string_lossy();
         if !path_str.contains("/migrations") {

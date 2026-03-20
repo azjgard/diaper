@@ -33,6 +33,21 @@ impl Rule for GraphqlTypeExport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/graphql-type-export.md"
     }
 
+    fn description(&self) -> &str {
+        "GraphQL types not using default export in type files"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["const MyType = new GraphQLObjectType({...});\nexport { MyType };"],
+            &["export default new GraphQLObjectType({...});"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

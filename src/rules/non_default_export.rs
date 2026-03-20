@@ -18,6 +18,21 @@ impl Rule for NonDefaultExport {
         "https://github.com/jordin/diaper/blob/main/docs/rules/non-default-export.md"
     }
 
+    fn description(&self) -> &str {
+        "Functions that aren't the default export"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["export function helper() {}"],
+            &["export default function main() {}"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

@@ -17,6 +17,21 @@ impl Rule for AsyncAwait {
         "https://github.com/jordin/diaper/blob/main/docs/rules/async-await.md"
     }
 
+    fn description(&self) -> &str {
+        "Flags async/await keywords"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["async function fetch() { await get(); }"],
+            &["function fetch() { return get().then(r => r); }"],
+        )
+    }
+
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
             return vec![];

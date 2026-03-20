@@ -175,6 +175,21 @@ impl Rule for SqlTableAlias {
         "https://github.com/jordin/diaper/blob/main/docs/rules/sql-table-alias.md"
     }
 
+    fn description(&self) -> &str {
+        "Table aliases in raw SQL queries"
+    }
+
+    fn default_score(&self) -> u32 {
+        SCORE_PER_VIOLATION
+    }
+
+    fn examples(&self) -> (&[&str], &[&str]) {
+        (
+            &["SELECT u.id FROM users u"],
+            &["SELECT users.id FROM users"],
+        )
+    }
+
     fn check(
         &self,
         source: &str,
