@@ -18,7 +18,9 @@ Install the stop hook so Claude automatically checks for violations before finis
 diaper install-hook
 ```
 
-This adds a [Stop hook](https://docs.anthropic.com/en/docs/claude-code/hooks) that blocks Claude from stopping if there are unresolved violations. Claude can accept violations by running `touch /tmp/diaper-check-accept`.
+This adds a [Stop hook](https://docs.anthropic.com/en/docs/claude-code/hooks) that runs `diaper check` against unstaged JavaScript files whenever Claude finishes a task. If there are unresolved violations, Claude is blocked from stopping and the violations are injected into context for it to fix. Claude can accept violations by running `touch /tmp/diaper-check-accept`.
+
+> **Note:** During the closed beta, the hook only runs in the `api-gateway` project.
 
 For the best experience, run Claude in bypass permissions mode so it can create the sentinel file without prompting:
 
@@ -92,15 +94,22 @@ Each violation shows: score, rule name, code sample, fix suggestion (green), and
 
 | Rule | Default Score | Description |
 |------|-------------|-------------|
-| `async-await` | 100 per use | Flags `async`/`await` keywords (excludes `index.spec.js` and `/migrations`) |
-| `ctx-destructure` | 10 per access | Direct `ctx.foo` access in pipe flow functions instead of destructuring |
+| `async-await` | 100 per use | Flags `async`/`await` keywords |
+| `async-promise-return` | 15 per return | Non-Promise returns in `-async` folder functions |
+| `ctx-destructure` | 10 per access | Direct `ctx.foo` access instead of destructuring |
 | `file-too-long` | 10 per 50 lines over 200 | Files over 200 lines accumulate stink |
-| `non-default-export` | 50 per function | Any function in a file that isn't the default export (including local functions) |
-| `pipe-property-init` | 100 per property | Properties set on `{ ...ctx }` in pipe flow functions not initialized in the parent pipe call |
+| `graphql-type-export` | 100 per type | GraphQL types not using default export in type files |
+| `non-default-export` | 50 per function | Any function that isn't the default export |
+| `non-idempotent-migration` | 50 per call | `addColumn`/`removeColumn` in migrations |
+| `pipe-property-init` | 100 per property | Pipe flow properties not initialized in parent pipe call |
+| `reduce-param-name` | 70 per call | `.reduce()` callback first param not named `prevVal` |
+| `require-query-attributes` | 10 per query | Sequelize queries missing explicit `attributes` |
+| `short-iter-param` | 15 per call | `.forEach`/`.map`/`.filter`/`.reduce` callback item param 3 chars or less |
 | `ternary-operator` | 10 single / 60 nested | Ternary expressions, with higher penalty for nesting |
+| `unsorted-string-array` | 5 per array | String arrays not in alphabetical order |
 | `upward-relative-import` | 100 per import | Imports using `../` paths (unless path contains "shared") |
 
-Every rule includes a fix suggestion and links to documentation so agents can understand *why* a smell exists and how to fix it.
+All rules exclude `index.spec.js` and `/migrations/` paths. Every rule includes a fix suggestion and documentation link.
 
 ## Configuration
 
@@ -109,13 +118,20 @@ Run `diaper init` to generate a `diaper.yml` with all defaults:
 ```yaml
 rules:
   async-await: 100
+  async-promise-return: 15
   ctx-destructure: 10
   file-too-long: 10
+  graphql-type-export: 100
   non-default-export: 50
+  non-idempotent-migration: 50
+  pipe-property-init: 100
+  reduce-param-name: 70
+  require-query-attributes: 10
+  short-iter-param: 15
   ternary-single: 10
   ternary-nested: 60
+  unsorted-string-array: 5
   upward-relative-import: 100
-  pipe-property-init: 100
 
 levels:
   damp: 0
