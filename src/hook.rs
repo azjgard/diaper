@@ -2,7 +2,6 @@ use std::fs;
 use std::path::PathBuf;
 
 const HOOK_SCRIPT_NAME: &str = "diaper-check.sh";
-const PROJECT_DIR: &str = "/Users/jordin/projects/core/api-gateway";
 
 fn hooks_dir() -> PathBuf {
     let home = std::env::var("HOME").expect("HOME not set");
@@ -23,8 +22,8 @@ fn generate_hook_script() -> String {
     let mut script = String::new();
     script.push_str("#!/bin/bash\n");
     script.push('\n');
-    script.push_str("# Only run in the api-gateway project\n");
-    script.push_str(&format!("[[ \"$PWD\" != \"{PROJECT_DIR}\" ]] && exit 0\n"));
+    script.push_str("# Only run in api-gateway projects\n");
+    script.push_str("[[ \"$PWD\" != *\"api-gateway\"* ]] && exit 0\n");
     script.push('\n');
     script.push_str("# Only run if there are unstaged changes to JavaScript files\n");
     script.push_str("git diff --name-only -- '*.js' | grep -q . || exit 0\n");
@@ -159,7 +158,7 @@ fn install_hook_to(script_path: &std::path::Path, settings_file: &std::path::Pat
 
     println!("added stop hook to {}", settings_file.display());
     println!();
-    println!("diaper will now check for violations when Claude stops in {PROJECT_DIR}");
+    println!("diaper will now check for violations when Claude stops in api-gateway projects");
     println!();
     println!("tip: run Claude in bypass permissions mode so it can touch /tmp/diaper-check-accept");
     println!("     to accept violations without getting prompted:");
@@ -175,9 +174,9 @@ mod tests {
     // --- generate_hook_script tests ---
 
     #[test]
-    fn test_generate_hook_script_contains_project_dir() {
+    fn test_generate_hook_script_contains_api_gateway_check() {
         let script = generate_hook_script();
-        assert!(script.contains(PROJECT_DIR));
+        assert!(script.contains("api-gateway"));
     }
 
     #[test]
@@ -252,7 +251,7 @@ mod tests {
                 "Stop": [{
                     "hooks": [{
                         "type": "command",
-                        "command": "/Users/jordin/.claude/hooks/diaper-check.sh"
+                        "command": "$HOME/.claude/hooks/diaper-check.sh"
                     }]
                 }]
             }
@@ -440,7 +439,7 @@ mod tests {
         assert!(script_path.exists());
         let contents = fs::read_to_string(&script_path).unwrap();
         assert!(contents.starts_with("#!/bin/bash"));
-        assert!(contents.contains(PROJECT_DIR));
+        assert!(contents.contains("api-gateway"));
     }
 
     #[test]
@@ -603,7 +602,7 @@ mod tests {
                     "matcher": "Bash|Write|Edit",
                     "hooks": [{
                         "type": "command",
-                        "command": "node /Users/jordin/.claude/hooks/safety-block.js",
+                        "command": "node $HOME/.claude/hooks/safety-block.js",
                         "timeout": 5
                     }]
                 }],
@@ -612,26 +611,26 @@ mod tests {
                         "matcher": "Write|Edit",
                         "hooks": [{
                             "type": "command",
-                            "command": "/Users/jordin/.claude/hooks/on-edit.sh"
+                            "command": "$HOME/.claude/hooks/on-edit.sh"
                         }]
                     },
                     {
                         "hooks": [{
                             "type": "command",
-                            "command": "node \"/Users/jordin/.claude/hooks/gsd-context-monitor.js\""
+                            "command": "node \"$HOME/.claude/hooks/gsd-context-monitor.js\""
                         }]
                     }
                 ],
                 "SessionStart": [{
                     "hooks": [{
                         "type": "command",
-                        "command": "node \"/Users/jordin/.claude/hooks/gsd-check-update.js\""
+                        "command": "node \"$HOME/.claude/hooks/gsd-check-update.js\""
                     }]
                 }]
             },
             "statusLine": {
                 "type": "command",
-                "command": "node \"/Users/jordin/.claude/hooks/gsd-statusline.js\""
+                "command": "node \"$HOME/.claude/hooks/gsd-statusline.js\""
             },
             "enabledPlugins": {
                 "lua-lsp@claude-plugins-official": true,
