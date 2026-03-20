@@ -8,7 +8,7 @@ mod watch;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "diaper", about = "Score JavaScript files for code smells")]
+#[command(name = "diaper", version, about = "Score JavaScript files for code smells")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -28,8 +28,29 @@ enum Commands {
     Watch,
     /// Generate a default diaper.yml config file
     Init,
-    /// Install Claude Code stop hook for diaper
+    /// Install Claude Code stop hook (blocks Claude on violations, use with claude --dangerously-skip-permissions)
     InstallHook,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+
+    #[test]
+    fn test_version_flag() {
+        let bin = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("debug")
+            .join("diaper");
+        let output = Command::new(&bin)
+            .arg("--version")
+            .output()
+            .expect("failed to run diaper — run `cargo build` first");
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(stdout.starts_with("diaper "));
+        assert!(stdout.contains(env!("CARGO_PKG_VERSION")));
+    }
 }
 
 fn main() {
