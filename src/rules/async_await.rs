@@ -3,7 +3,8 @@ use std::path::Path;
 use super::{Rule, RuleViolation};
 
 /// Rule: usage of `async` or `await` keywords adds 100 stink per occurrence,
-/// unless the file is named "index.spec.js" or the path contains "/migrations".
+/// unless the file is named "index.spec.js" or the path contains "/migrations",
+/// or "/tests/factories/".
 pub struct AsyncAwait;
 
 const SCORE_PER_VIOLATION: u32 = 100;
@@ -34,6 +35,11 @@ impl Rule for AsyncAwait {
 
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
         if super::is_excluded_file(path) {
+            return vec![];
+        }
+
+        let path_str = path.to_string_lossy();
+        if path_str.contains("/tests/factories/") {
             return vec![];
         }
 
@@ -180,6 +186,30 @@ mod tests {
     fn test_migrations_nested_excluded() {
         let violations = check_with_path("async function foo() {}", "db/migrations/seed.js");
         assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_tests_factories_path_excluded() {
+        let violations = check_with_path("async function foo() {}", "src/tests/factories/user.js");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_tests_factories_nested_excluded() {
+        let violations = check_with_path("async function foo() {}", "packages/app/tests/factories/seed.js");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_tests_without_factories_not_excluded() {
+        let violations = check_with_path("async function foo() {}", "src/tests/helper.js");
+        assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn test_factories_without_tests_not_excluded() {
+        let violations = check_with_path("async function foo() {}", "src/factories/user.js");
+        assert_eq!(violations.len(), 1);
     }
 
     // --- NOT excluded ---
