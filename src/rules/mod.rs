@@ -1,6 +1,7 @@
 pub mod async_await;
 pub mod async_promise_return;
 pub mod ctx_destructure;
+pub mod distinct_array;
 pub mod file_too_long;
 pub mod graphql_type_export;
 pub mod non_default_export;
@@ -108,6 +109,7 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(async_await::AsyncAwait),
         Box::new(async_promise_return::AsyncPromiseReturn),
         Box::new(ctx_destructure::CtxDestructure),
+        Box::new(distinct_array::DistinctArray),
         Box::new(file_too_long::FileTooLong),
         Box::new(graphql_type_export::GraphqlTypeExport),
         Box::new(non_default_export::NonDefaultExport),
