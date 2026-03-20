@@ -182,6 +182,7 @@ fn returns_promise(node: tree_sitter::Node, source: &str) -> bool {
         || text.contains("Promise.all")
         || text.contains("Promise.race")
         || text.contains("new Promise")
+        || text.contains("pipe(")
     {
         return true;
     }
@@ -344,6 +345,26 @@ mod tests {
         };"#;
         let violations = check(source);
         assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_pipe_call_not_flagged() {
+        let source = r#"export default (ctx) => {
+            return pipe(ctx, [step1, step2]);
+        };"#;
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_pipe_call_among_other_returns() {
+        let source = r#"export default (ctx) => {
+            if (!ctx.ready) return ctx;
+            return pipe(ctx, [step1, step2]);
+        };"#;
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].code_sample.contains("return ctx"));
     }
 
     // --- Path filtering ---
