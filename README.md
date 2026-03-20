@@ -1,3 +1,11 @@
+```
+    ~ ~ ~
+ _____o_____
+|   diaper   |
+ \          /
+  \________/
+```
+
 # diaper
 
 A fast JavaScript code smell scorer built with Rust and tree-sitter. Think of it like ESLint, but focused on structural code smells and designed to help AI agents write better code without constant human babysitting.
