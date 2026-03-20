@@ -211,17 +211,16 @@ fn find_query_violations(
 
                             if let Some(opts) = args.named_child(opts_index) {
                                 if opts.kind() == "object" {
-                                    validate_query_object(opts, source, external_attrs, violations, rule, score, node);
+                                    validate_query_object(opts, source, external_attrs, violations, rule, score, node, obj_text);
                                 }
                             } else if method != "findByPk" {
-                                // No options object at all for findOne/findAll
                                 let line = source.lines().nth(node.start_position().row).unwrap_or("");
                                 violations.push(RuleViolation {
                                     rule_name: rule.name().to_string(),
                                     doc_url: rule.doc_url().to_string(),
                                     score,
                                     code_sample: line.trim().to_string(),
-                                    fix_suggestion: "specify explicit attributes including 'id'".to_string(),
+                                    fix_suggestion: format!("specify explicit attributes including 'id' for {obj_text}"),
                                 });
                             }
                         }
@@ -246,6 +245,7 @@ fn validate_query_object(
     rule: &RequireQueryAttributes,
     score: u32,
     call_node: tree_sitter::Node,
+    model_name: &str,
 ) {
     let mut attributes_node = None;
     let mut where_node = None;
@@ -290,7 +290,7 @@ fn validate_query_object(
                 doc_url: rule.doc_url().to_string(),
                 score,
                 code_sample: line.trim().to_string(),
-                fix_suggestion: format!("specify {missing_str} in explicit queried attributes"),
+                fix_suggestion: format!("specify {missing_str} in explicit queried attributes for {model_name}"),
             });
 
             // Still check includes
@@ -338,7 +338,7 @@ fn validate_query_object(
             doc_url: rule.doc_url().to_string(),
             score,
             code_sample: line.trim().to_string(),
-            fix_suggestion: format!("specify {missing_str} in explicit queried attributes"),
+            fix_suggestion: format!("specify {missing_str} in explicit queried attributes for {model_name}"),
         });
     }
 
@@ -364,10 +364,28 @@ fn validate_includes(
     let mut cursor = include_node.walk();
     for child in include_node.children(&mut cursor) {
         if child.kind() == "object" {
-            // Use the include object itself as the "call node" for line reporting
-            validate_query_object(child, source, external_attrs, violations, rule, score, child);
+            let include_model = extract_include_model_name(child, source)
+                .unwrap_or("unknown");
+            validate_query_object(child, source, external_attrs, violations, rule, score, child, include_model);
         }
     }
+}
+
+/// Extract the model name from an include object's `model: ModelName` pair.
+fn extract_include_model_name<'a>(obj: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
+    let mut cursor = obj.walk();
+    for child in obj.children(&mut cursor) {
+        if child.kind() == "pair" {
+            if let Some(key) = child.child_by_field_name("key") {
+                if &source[key.byte_range()] == "model" {
+                    if let Some(value) = child.child_by_field_name("value") {
+                        return Some(&source[value.byte_range()]);
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Extract string values from an array node.
