@@ -6,11 +6,16 @@ Instead of warnings and errors, diaper scores files with **stink points**. Each 
 
 ## Install
 
+```sh
+curl -fsSL https://raw.githubusercontent.com/azjgard/diaper/main/install.sh | bash
+```
+
+### From source
+
 Requires Rust 1.85+.
 
 ```sh
 cargo build --release
-# optionally symlink into your PATH
 ln -sf $(pwd)/target/release/diaper ~/bin/diaper
 ```
 
