@@ -29,7 +29,7 @@ impl Rule for NonIdempotentMigration {
     fn examples(&self) -> (&[&str], &[&str]) {
         (
             &["queryInterface.addColumn('users', 'email', ...)"],
-            &["// use a raw SQL migration instead"],
+            &["addColumnIfNotExists({ table: 'users', column: 'email', ... })"],
         )
     }
 
