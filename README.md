@@ -1,12 +1,6 @@
-<div align="center">
-<pre>
-    ~ ~ ~
- _____o_____
-|   diaper   |
- \          /
-  \________/
-</pre>
-</div>
+<p align="center">
+  <img src="assets/logo.png" alt="diaper" width="316">
+</p>
 
 # diaper
 
