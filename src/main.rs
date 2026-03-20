@@ -34,6 +34,9 @@ enum Commands {
     Rules {
         /// Rule name to show details for
         name: Option<String>,
+        /// Show full details for all rules
+        #[arg(long, short)]
+        verbose: bool,
     },
 }
 
@@ -53,7 +56,7 @@ fn print_rules_list() {
     println!("\n{DIM}Run 'diaper rules <name>' for details and examples.{RESET}");
 }
 
-fn print_rule_detail(name: &str) {
+fn print_rule_detail_by_name(name: &str) {
     let all = rules::all_rules();
     let rule = match all.iter().find(|r| r.name() == name) {
         Some(r) => r,
@@ -63,7 +66,10 @@ fn print_rule_detail(name: &str) {
             std::process::exit(1);
         }
     };
+    print_rule_detail(rule.as_ref());
+}
 
+fn print_rule_detail(rule: &dyn rules::Rule) {
     println!("{BOLD}{CYAN}{}{RESET}", rule.name());
     println!("{}", rule.description());
     println!("{DIM}score: {}{RESET}", rule.default_score());
@@ -87,6 +93,17 @@ fn print_rule_detail(name: &str) {
                 println!("  {GREEN}{line}{RESET}");
             }
         }
+    }
+}
+
+fn print_rules_verbose() {
+    let all = rules::all_rules();
+    println!("{BOLD}diaper rules{RESET} ({} total)\n", all.len());
+    for (i, rule) in all.iter().enumerate() {
+        if i > 0 {
+            println!("\n{DIM}---{RESET}\n");
+        }
+        print_rule_detail(rule.as_ref());
     }
 }
 
@@ -171,9 +188,10 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Commands::Rules { name } => {
+        Commands::Rules { name, verbose } => {
             match name {
-                Some(n) => print_rule_detail(&n),
+                Some(n) => print_rule_detail_by_name(&n),
+                None if verbose => print_rules_verbose(),
                 None => print_rules_list(),
             }
         }
