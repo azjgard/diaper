@@ -5,6 +5,7 @@ pub mod graphql_type_export;
 pub mod non_default_export;
 pub mod non_idempotent_migration;
 pub mod pipe_property_init;
+pub mod sql_table_alias;
 pub mod ternary_operator;
 pub mod unsorted_string_array;
 pub mod upward_relative_import;
@@ -94,6 +95,7 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(non_default_export::NonDefaultExport),
         Box::new(non_idempotent_migration::NonIdempotentMigration),
         Box::new(pipe_property_init::PipePropertyInit),
+        Box::new(sql_table_alias::SqlTableAlias),
         Box::new(ternary_operator::TernaryOperator),
         Box::new(unsorted_string_array::UnsortedStringArray),
         Box::new(upward_relative_import::UpwardRelativeImport),

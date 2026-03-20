@@ -65,6 +65,7 @@ pub const DEFAULT_NON_IDEMPOTENT_MIGRATION: u32 = 50;
 pub const DEFAULT_TERNARY_SINGLE: u32 = 10;
 pub const DEFAULT_TERNARY_NESTED: u32 = 60;
 pub const DEFAULT_UNSORTED_STRING_ARRAY: u32 = 5;
+pub const DEFAULT_SQL_TABLE_ALIAS: u32 = 100;
 pub const DEFAULT_UPWARD_RELATIVE_IMPORT: u32 = 100;
 pub const DEFAULT_PIPE_PROPERTY_INIT: u32 = 100;
 
@@ -135,6 +136,7 @@ rules:
   unsorted-string-array: {DEFAULT_UNSORTED_STRING_ARRAY}
   upward-relative-import: {DEFAULT_UPWARD_RELATIVE_IMPORT}
   pipe-property-init: {DEFAULT_PIPE_PROPERTY_INIT}
+  sql-table-alias: {DEFAULT_SQL_TABLE_ALIAS}
 
 levels:
   damp: {DEFAULT_DAMP_MIN}
