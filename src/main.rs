@@ -18,7 +18,7 @@ struct Cli {
 enum Commands {
     /// Check files for code smells
     Check {
-        /// File path to check (if omitted, checks unstaged git changes)
+        /// File or directory path to check (if omitted, checks unstaged git changes)
         path: Option<String>,
         /// Output results as JSON
         #[arg(long)]
@@ -109,6 +109,8 @@ fn print_rules_verbose() {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use std::fs;
     use std::process::Command;
 
     #[test]
@@ -126,6 +128,104 @@ mod tests {
         assert!(stdout.starts_with("diaper "));
         assert!(stdout.contains(env!("CARGO_PKG_VERSION")));
     }
+
+    #[test]
+    fn test_collect_js_files_finds_js() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("a.js"), "const x = 1;").unwrap();
+        fs::write(dir.path().join("b.js"), "const y = 2;").unwrap();
+        fs::write(dir.path().join("c.txt"), "not js").unwrap();
+
+        let files = collect_js_files(dir.path().to_str().unwrap());
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().all(|f| f.ends_with(".js")));
+    }
+
+    #[test]
+    fn test_collect_js_files_recurses_subdirs() {
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("sub");
+        fs::create_dir(&sub).unwrap();
+        fs::write(dir.path().join("top.js"), "1;").unwrap();
+        fs::write(sub.join("nested.js"), "2;").unwrap();
+
+        let files = collect_js_files(dir.path().to_str().unwrap());
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().any(|f| f.contains("nested.js")));
+    }
+
+    #[test]
+    fn test_collect_js_files_skips_node_modules() {
+        let dir = tempfile::tempdir().unwrap();
+        let nm = dir.path().join("node_modules");
+        fs::create_dir(&nm).unwrap();
+        fs::write(dir.path().join("app.js"), "1;").unwrap();
+        fs::write(nm.join("lib.js"), "2;").unwrap();
+
+        let files = collect_js_files(dir.path().to_str().unwrap());
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("app.js"));
+    }
+
+    #[test]
+    fn test_collect_js_files_skips_dot_git() {
+        let dir = tempfile::tempdir().unwrap();
+        let git = dir.path().join(".git");
+        fs::create_dir(&git).unwrap();
+        fs::write(dir.path().join("app.js"), "1;").unwrap();
+        fs::write(git.join("hook.js"), "2;").unwrap();
+
+        let files = collect_js_files(dir.path().to_str().unwrap());
+        assert_eq!(files.len(), 1);
+    }
+
+    #[test]
+    fn test_collect_js_files_empty_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = collect_js_files(dir.path().to_str().unwrap());
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn test_collect_js_files_sorted() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("z.js"), "1;").unwrap();
+        fs::write(dir.path().join("a.js"), "2;").unwrap();
+        fs::write(dir.path().join("m.js"), "3;").unwrap();
+
+        let files = collect_js_files(dir.path().to_str().unwrap());
+        assert_eq!(files.len(), 3);
+        assert!(files[0] < files[1]);
+        assert!(files[1] < files[2]);
+    }
+}
+
+/// Recursively collect all `.js` files under a directory, skipping ignored dirs.
+fn collect_js_files(dir: &str) -> Vec<String> {
+    let mut files = Vec::new();
+    let mut dirs = vec![std::path::PathBuf::from(dir)];
+
+    while let Some(current) = dirs.pop() {
+        let entries = match std::fs::read_dir(&current) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if !watch::should_ignore(&path) {
+                    dirs.push(path);
+                }
+            } else if path.extension().and_then(|e| e.to_str()) == Some("js") {
+                if let Some(s) = path.to_str() {
+                    files.push(s.to_string());
+                }
+            }
+        }
+    }
+
+    files.sort();
+    files
 }
 
 fn main() {
@@ -142,7 +242,14 @@ fn main() {
             };
 
             let files = match path {
-                Some(p) => vec![p],
+                Some(p) => {
+                    let meta = std::fs::metadata(&p);
+                    if meta.as_ref().map(|m| m.is_dir()).unwrap_or(false) {
+                        collect_js_files(&p)
+                    } else {
+                        vec![p]
+                    }
+                }
                 None => match git::unstaged_changed_files() {
                     Ok(files) => files,
                     Err(e) => {
