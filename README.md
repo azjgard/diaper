@@ -1,10 +1,12 @@
-```
+<div align="center">
+<pre>
     ~ ~ ~
  _____o_____
 |   diaper   |
  \          /
   \________/
-```
+</pre>
+</div>
 
 # diaper
 
