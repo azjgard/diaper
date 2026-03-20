@@ -42,15 +42,11 @@ impl Rule for AsyncPromiseReturn {
     }
 }
 
-/// Check if the file is inside a directory ending with "-async".
+/// Check if the file's immediate parent directory ends with "-async".
 fn is_in_async_folder(path: &Path) -> bool {
-    for component in path.components() {
-        let s = component.as_os_str().to_string_lossy();
-        if s.ends_with("-async") {
-            return true;
-        }
-    }
-    false
+    path.parent()
+        .and_then(|p| p.file_name())
+        .is_some_and(|name| name.to_string_lossy().ends_with("-async"))
 }
 
 /// Find the function node from a default export.
@@ -351,7 +347,7 @@ mod tests {
     fn test_async_folder_detected() {
         let violations = check_with_path(
             r#"export default (ctx) => { if (!ctx.x) return ctx; return fetch('/api').then(() => ctx); };"#,
-            "src/pipes/do-thing-async/steps/myStep.js",
+            "src/pipes/do-thing-async/index.js",
         );
         assert_eq!(violations.len(), 1);
     }
@@ -363,6 +359,36 @@ mod tests {
             "packages/core/pipes/process-async/index.js",
         );
         assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn test_async_ancestor_but_not_parent_skipped() {
+        // -async is in the path but not the immediate parent directory
+        let violations = check_with_path(
+            r#"export default (ctx) => { return ctx; };"#,
+            "src/queries/get-data-points-async/build-query/index.js",
+        );
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_async_ancestor_with_async_parent() {
+        // -async appears twice: ancestor and immediate parent
+        let violations = check_with_path(
+            r#"export default (ctx) => { return ctx; };"#,
+            "src/queries/get-data-points-async/build-query-async/index.js",
+        );
+        assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn test_child_of_async_folder_not_flagged() {
+        // File is in a subfolder of -async, not directly in -async
+        let violations = check_with_path(
+            r#"export default (ctx) => { if (!ctx.x) return ctx; return fetch('/api').then(() => ctx); };"#,
+            "src/pipes/do-thing-async/steps/myStep.js",
+        );
+        assert!(violations.is_empty());
     }
 
     // --- Edge cases ---
