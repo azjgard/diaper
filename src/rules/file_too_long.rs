@@ -39,6 +39,10 @@ impl Rule for FileTooLong {
             return vec![];
         }
 
+        if path.to_string_lossy().contains("src/models") {
+            return vec![];
+        }
+
         let points_per_bucket = config.rule_score("file-too-long", POINTS_PER_BUCKET);
         let line_count = source.lines().count() as u32;
 
@@ -139,6 +143,26 @@ mod tests {
     fn test_violation_has_doc_url() {
         let violations = check(&make_source(300));
         assert!(violations[0].doc_url.starts_with("https://"));
+    }
+
+    #[test]
+    fn test_skips_src_models_path() {
+        let source = &make_source(500);
+        let tree = parse_js(source).unwrap();
+        let mut cache = super::super::AstCache::new();
+        let config = crate::config::Config::default();
+        let violations = FileTooLong.check(source, Path::new("src/models/user.js"), &tree, &mut cache, &config);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_skips_nested_src_models_path() {
+        let source = &make_source(500);
+        let tree = parse_js(source).unwrap();
+        let mut cache = super::super::AstCache::new();
+        let config = crate::config::Config::default();
+        let violations = FileTooLong.check(source, Path::new("app/src/models/order.js"), &tree, &mut cache, &config);
+        assert!(violations.is_empty());
     }
 
     #[test]
