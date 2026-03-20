@@ -10,6 +10,22 @@ Instead of warnings and errors, diaper scores files with **stink points**. Each 
 curl -fsSL https://raw.githubusercontent.com/azjgard/diaper/main/install.sh | bash
 ```
 
+### Claude Code integration
+
+Install the stop hook so Claude automatically checks for violations before finishing:
+
+```sh
+diaper install-hook
+```
+
+This adds a [Stop hook](https://docs.anthropic.com/en/docs/claude-code/hooks) that blocks Claude from stopping if there are unresolved violations. Claude can accept violations by running `touch /tmp/diaper-check-accept`.
+
+For the best experience, run Claude in bypass permissions mode so it can create the sentinel file without prompting:
+
+```sh
+claude --dangerously-skip-permissions
+```
+
 ### From source
 
 Requires Rust 1.85+.
