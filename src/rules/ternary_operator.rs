@@ -18,7 +18,11 @@ impl Rule for TernaryOperator {
         "https://github.com/jordin/diaper/blob/main/docs/rules/ternary-operator.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let single_score = config.rule_score("ternary-single", SINGLE_SCORE);
         let nested_score = config.rule_score("ternary-nested", NESTED_SCORE);
         let mut violations = Vec::new();
@@ -49,7 +53,7 @@ fn collect_ternaries(
                 doc_url: rule.doc_url().to_string(),
                 score: nested_score,
                 code_sample: line.trim().to_string(),
-                fix_suggestion: format!("refactor nested ternary ({depth} levels) into if/else or separate variables"),
+                fix_suggestion: format!("extract nested ternary ({depth} levels) into a sub-function with early returns for each branch"),
             });
         } else {
             violations.push(RuleViolation {
@@ -57,7 +61,7 @@ fn collect_ternaries(
                 doc_url: rule.doc_url().to_string(),
                 score: single_score,
                 code_sample: line.trim().to_string(),
-                fix_suggestion: "replace ternary with if/else for readability".to_string(),
+                fix_suggestion: "extract into a sub-function with early returns for each branch".to_string(),
             });
         }
 

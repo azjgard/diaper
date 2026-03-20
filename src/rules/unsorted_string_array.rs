@@ -16,7 +16,11 @@ impl Rule for UnsortedStringArray {
         "https://github.com/jordin/diaper/blob/main/docs/rules/unsorted-string-array.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let score = config.rule_score("unsorted-string-array", SCORE_PER_VIOLATION);
         let mut violations = Vec::new();
         find_unsorted_arrays(tree.root_node(), source, &mut violations, self, score);

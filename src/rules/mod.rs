@@ -1,10 +1,14 @@
 pub mod async_await;
+pub mod async_promise_return;
 pub mod ctx_destructure;
 pub mod file_too_long;
 pub mod graphql_type_export;
 pub mod non_default_export;
 pub mod non_idempotent_migration;
 pub mod pipe_property_init;
+pub mod reduce_param_name;
+pub mod require_query_attributes;
+pub mod short_iter_param;
 pub mod sql_table_alias;
 pub mod ternary_operator;
 pub mod unsorted_string_array;
@@ -43,6 +47,19 @@ pub trait Rule {
     /// `tree` is the tree-sitter parse tree for the file,
     /// `cache` allows rules to parse and access other files' ASTs on demand.
     fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, cache: &mut AstCache, config: &Config) -> Vec<RuleViolation>;
+}
+
+/// Returns true if the file should be skipped by most rules.
+/// Skips index.spec.js files and files in /migrations/ paths.
+pub fn is_excluded_file(path: &Path) -> bool {
+    if path.file_name().is_some_and(|f| f == "index.spec.js") {
+        return true;
+    }
+    let path_str = path.to_string_lossy();
+    if path_str.contains("/migrations") {
+        return true;
+    }
+    false
 }
 
 /// Parse JavaScript source into a tree-sitter tree.
@@ -89,12 +106,16 @@ impl AstCache {
 pub fn all_rules() -> Vec<Box<dyn Rule>> {
     vec![
         Box::new(async_await::AsyncAwait),
+        Box::new(async_promise_return::AsyncPromiseReturn),
         Box::new(ctx_destructure::CtxDestructure),
         Box::new(file_too_long::FileTooLong),
         Box::new(graphql_type_export::GraphqlTypeExport),
         Box::new(non_default_export::NonDefaultExport),
         Box::new(non_idempotent_migration::NonIdempotentMigration),
         Box::new(pipe_property_init::PipePropertyInit),
+        Box::new(reduce_param_name::ReduceParamName),
+        Box::new(require_query_attributes::RequireQueryAttributes),
+        Box::new(short_iter_param::ShortIterParam),
         Box::new(sql_table_alias::SqlTableAlias),
         Box::new(ternary_operator::TernaryOperator),
         Box::new(unsorted_string_array::UnsortedStringArray),

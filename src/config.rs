@@ -57,6 +57,7 @@ pub const DEFAULT_BLOWOUT_MIN: u32 = 100;
 
 /// Default rule scores.
 pub const DEFAULT_ASYNC_AWAIT: u32 = 100;
+pub const DEFAULT_ASYNC_PROMISE_RETURN: u32 = 15;
 pub const DEFAULT_CTX_DESTRUCTURE: u32 = 10;
 pub const DEFAULT_FILE_TOO_LONG: u32 = 10;
 pub const DEFAULT_GRAPHQL_TYPE_EXPORT: u32 = 100;
@@ -68,6 +69,9 @@ pub const DEFAULT_UNSORTED_STRING_ARRAY: u32 = 5;
 pub const DEFAULT_SQL_TABLE_ALIAS: u32 = 100;
 pub const DEFAULT_UPWARD_RELATIVE_IMPORT: u32 = 100;
 pub const DEFAULT_PIPE_PROPERTY_INIT: u32 = 100;
+pub const DEFAULT_REDUCE_PARAM_NAME: u32 = 70;
+pub const DEFAULT_REQUIRE_QUERY_ATTRIBUTES: u32 = 10;
+pub const DEFAULT_SHORT_ITER_PARAM: u32 = 15;
 
 impl Config {
     /// Load config from diaper.yml in the current directory.
@@ -126,6 +130,7 @@ pub fn generate_default_config() -> String {
 
 rules:
   async-await: {DEFAULT_ASYNC_AWAIT}
+  async-promise-return: {DEFAULT_ASYNC_PROMISE_RETURN}
   ctx-destructure: {DEFAULT_CTX_DESTRUCTURE}
   file-too-long: {DEFAULT_FILE_TOO_LONG}
   graphql-type-export: {DEFAULT_GRAPHQL_TYPE_EXPORT}
@@ -136,6 +141,9 @@ rules:
   unsorted-string-array: {DEFAULT_UNSORTED_STRING_ARRAY}
   upward-relative-import: {DEFAULT_UPWARD_RELATIVE_IMPORT}
   pipe-property-init: {DEFAULT_PIPE_PROPERTY_INIT}
+  reduce-param-name: {DEFAULT_REDUCE_PARAM_NAME}
+  require-query-attributes: {DEFAULT_REQUIRE_QUERY_ATTRIBUTES}
+  short-iter-param: {DEFAULT_SHORT_ITER_PARAM}
   sql-table-alias: {DEFAULT_SQL_TABLE_ALIAS}
 
 levels:

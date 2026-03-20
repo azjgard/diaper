@@ -18,7 +18,11 @@ impl Rule for CtxDestructure {
         "https://github.com/jordin/diaper/blob/main/docs/rules/ctx-destructure.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let score = config.rule_score("ctx-destructure", SCORE_PER_VIOLATION);
 
         // Only applies to files with a default export function that has a single `ctx` param

@@ -5,7 +5,7 @@ use std::process::Command;
 pub fn unstaged_changed_files() -> Result<Vec<String>, String> {
     // Get modified but unstaged files
     let modified = Command::new("git")
-        .args(["diff", "--name-only"])
+        .args(["diff", "--name-only", "--diff-filter=d"])
         .output()
         .map_err(|e| format!("failed to run git diff: {e}"))?;
 

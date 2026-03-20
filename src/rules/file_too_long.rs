@@ -19,7 +19,11 @@ impl Rule for FileTooLong {
         "https://github.com/jordin/diaper/blob/main/docs/rules/file-too-long.md"
     }
 
-    fn check(&self, source: &str, _path: &Path, _tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+    fn check(&self, source: &str, path: &Path, _tree: &tree_sitter::Tree, _cache: &mut super::AstCache, config: &crate::config::Config) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let points_per_bucket = config.rule_score("file-too-long", POINTS_PER_BUCKET);
         let line_count = source.lines().count() as u32;
 
