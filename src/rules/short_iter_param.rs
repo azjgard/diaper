@@ -103,7 +103,9 @@ fn check_callback_param(
     match callback.kind() {
         "arrow_function" | "function" | "function_expression" => {
             if let Some(param_name) = get_nth_param_name(callback, source, param_index) {
-                if param_name.len() <= MAX_SHORT_LENGTH {
+                if param_name == "_" {
+                    // Convention for intentionally unused params
+                } else if param_name.len() <= MAX_SHORT_LENGTH {
                     let line = source.lines().nth(call_node.start_position().row).unwrap_or("");
                     violations.push(RuleViolation {
                         rule_name: rule.name().to_string(),
@@ -304,6 +306,24 @@ mod tests {
     #[test]
     fn test_reduce_descriptive_second_param() {
         let violations = check("const total = items.reduce((prevVal, currentItem) => prevVal + currentItem, 0);");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_underscore_param_ignored() {
+        let violations = check("items.forEach((_) => doSomething());");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_underscore_param_in_map() {
+        let violations = check("items.map((_, i) => i);");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_underscore_reduce_second_param_ignored() {
+        let violations = check("items.reduce((prevVal, _) => prevVal, 0);");
         assert!(violations.is_empty());
     }
 
