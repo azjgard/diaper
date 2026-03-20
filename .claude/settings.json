@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "make release 2>/dev/null || true",
+            "timeout": 120,
+            "statusMessage": "Building release binary..."
+          }
+        ]
+      }
+    ]
+  }
+}
