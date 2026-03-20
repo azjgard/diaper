@@ -26,19 +26,25 @@ fn generate_hook_script() -> String {
     script.push_str("# Only run in the api-gateway project\n");
     script.push_str(&format!("[[ \"$PWD\" != \"{PROJECT_DIR}\" ]] && exit 0\n"));
     script.push('\n');
-    script.push_str("# Allow Claude to accept violations and skip this check once\n");
-    script.push_str("[[ -f /tmp/diaper-check-accept ]] && rm -f /tmp/diaper-check-accept && exit 0\n");
-    script.push('\n');
     script.push_str("# Only run if there are unstaged changes to JavaScript files\n");
     script.push_str("git diff --name-only -- '*.js' | grep -q . || exit 0\n");
     script.push('\n');
     script.push_str("# Run diaper check with JSON output\n");
     script.push_str(&format!("OUTPUT=$({diaper_bin} check --json 2>&1)\n"));
+    script.push_str("EXIT_CODE=$?\n");
     script.push('\n');
     script.push_str("# Exit cleanly if there are no violations\n");
     script.push_str("echo \"$OUTPUT\" | jq -e 'length > 0' > /dev/null 2>&1 || exit 0\n");
     script.push('\n');
-    script.push_str("# Block Claude from stopping and inject violations into context\n");
+    script.push_str("# Blowouts (exit code 1) must be fixed — no escape hatch\n");
+    script.push_str("if [ \"$EXIT_CODE\" -ne 0 ]; then\n");
+    script.push_str("  echo \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":$(echo \"diaper check found BLOWOUT violations that must be fixed.\\n\\n$OUTPUT\" | jq -Rs .)}\"\n");
+    script.push_str("  exit 0\n");
+    script.push_str("fi\n");
+    script.push('\n');
+    script.push_str("# Non-blowout violations can be accepted via sentinel file\n");
+    script.push_str("[[ -f /tmp/diaper-check-accept ]] && rm -f /tmp/diaper-check-accept && exit 0\n");
+    script.push('\n');
     script.push_str("echo \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":$(echo \"diaper check found violations. Review and fix them, or if acceptable, run: touch /tmp/diaper-check-accept\\n\\n$OUTPUT\" | jq -Rs .)}\"\n");
     script
 }
@@ -652,5 +658,36 @@ mod tests {
 
         // New Stop hook added
         assert_eq!(settings["hooks"]["Stop"].as_array().unwrap().len(), 1);
+    }
+
+    // --- Script content: blowout vs non-blowout behavior ---
+
+    #[test]
+    fn test_script_captures_exit_code() {
+        let script = generate_hook_script();
+        assert!(script.contains("EXIT_CODE=$?"));
+    }
+
+    #[test]
+    fn test_script_blowouts_block_without_escape_hatch() {
+        let script = generate_hook_script();
+        // The blowout branch checks exit code and blocks without mentioning sentinel
+        assert!(script.contains("if [ \"$EXIT_CODE\" -ne 0 ]"));
+        assert!(script.contains("BLOWOUT violations that must be fixed"));
+    }
+
+    #[test]
+    fn test_script_sentinel_only_for_non_blowouts() {
+        let script = generate_hook_script();
+        // The sentinel file check comes AFTER the blowout branch
+        let blowout_pos = script.find("EXIT_CODE\" -ne 0").unwrap();
+        let sentinel_pos = script.find("/tmp/diaper-check-accept").unwrap();
+        assert!(sentinel_pos > blowout_pos, "sentinel check should come after blowout check");
+    }
+
+    #[test]
+    fn test_script_non_blowout_mentions_accept() {
+        let script = generate_hook_script();
+        assert!(script.contains("touch /tmp/diaper-check-accept"));
     }
 }
