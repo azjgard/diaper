@@ -62,8 +62,8 @@ pub fn tier_for_score(score: u32, config: &Config) -> Tier {
     }
 }
 
-/// Check a single file against all rules.
-pub fn check_file(path: &str, cache: &mut AstCache, config: &Config) -> Result<FileResult, String> {
+/// Check a single file against all rules (or a filtered subset).
+pub fn check_file(path: &str, cache: &mut AstCache, config: &Config, rule_filter: &[String]) -> Result<FileResult, String> {
     let source = fs::read_to_string(path)
         .map_err(|e| format!("failed to read {path}: {e}"))?;
 
@@ -77,7 +77,12 @@ pub fn check_file(path: &str, cache: &mut AstCache, config: &Config) -> Result<F
         cache.insert(abs, source.clone(), tree.clone());
     }
 
-    let rules = rules::all_rules();
+    let all_rules = rules::all_rules();
+    let rules: Vec<_> = if rule_filter.is_empty() {
+        all_rules
+    } else {
+        all_rules.into_iter().filter(|r| rule_filter.iter().any(|f| f == r.name())).collect()
+    };
 
     let mut violations = Vec::new();
     for rule in &rules {
@@ -102,7 +107,7 @@ pub fn check_file(path: &str, cache: &mut AstCache, config: &Config) -> Result<F
 }
 
 /// Check multiple files and print results. Returns true if any blowouts were found.
-pub fn check_files(paths: &[String], config: &Config) -> Result<bool, String> {
+pub fn check_files(paths: &[String], config: &Config, rule_filter: &[String]) -> Result<bool, String> {
     let js_paths: Vec<&String> = paths.iter()
         .filter(|p| p.ends_with(".js"))
         .collect();
@@ -118,7 +123,7 @@ pub fn check_files(paths: &[String], config: &Config) -> Result<bool, String> {
     let blowout_min = config.level_min("blowout", config::DEFAULT_BLOWOUT_MIN);
 
     for path in &js_paths {
-        let result = check_file(path, &mut cache, config)?;
+        let result = check_file(path, &mut cache, config, rule_filter)?;
 
         if result.total_score > 0 {
             any_smells = true;
@@ -167,7 +172,7 @@ struct JsonViolation {
 }
 
 /// Check multiple files and print results as JSON. Returns true if any smells were found.
-pub fn check_files_json(paths: &[String], config: &Config) -> Result<bool, String> {
+pub fn check_files_json(paths: &[String], config: &Config, rule_filter: &[String]) -> Result<bool, String> {
     let js_paths: Vec<&String> = paths.iter()
         .filter(|p| p.ends_with(".js"))
         .collect();
@@ -178,7 +183,7 @@ pub fn check_files_json(paths: &[String], config: &Config) -> Result<bool, Strin
     let blowout_min = config.level_min("blowout", config::DEFAULT_BLOWOUT_MIN);
 
     for path in &js_paths {
-        let result = check_file(path, &mut cache, config)?;
+        let result = check_file(path, &mut cache, config, rule_filter)?;
 
         if result.total_score > 0 {
             if result.total_score >= blowout_min {
@@ -232,7 +237,7 @@ mod tests {
         let file = create_temp_js_file("const x = 1;\n");
         let mut cache = AstCache::new();
         let config = default_config();
-        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config).unwrap();
+        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config, &[]).unwrap();
         assert_eq!(result.total_score, 0);
         assert!(result.violations.is_empty());
     }
@@ -243,7 +248,7 @@ mod tests {
         let file = create_temp_js_file(&source);
         let mut cache = AstCache::new();
         let config = default_config();
-        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config).unwrap();
+        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config, &[]).unwrap();
         assert_eq!(result.total_score, 20);
         assert_eq!(result.violations.len(), 1);
     }
@@ -252,7 +257,7 @@ mod tests {
     fn test_check_file_nonexistent() {
         let mut cache = AstCache::new();
         let config = default_config();
-        let result = check_file("/tmp/nonexistent_diaper_test.js", &mut cache, &config);
+        let result = check_file("/tmp/nonexistent_diaper_test.js", &mut cache, &config, &[]);
         assert!(result.is_err());
     }
 
@@ -260,7 +265,7 @@ mod tests {
     fn test_check_files_filters_non_js() {
         let files = vec!["foo.rs".to_string(), "bar.py".to_string()];
         let config = default_config();
-        let result = check_files(&files, &config);
+        let result = check_files(&files, &config, &[]);
         assert!(result.is_ok());
     }
 
@@ -270,7 +275,7 @@ mod tests {
         let file = create_temp_js_file(&source);
         let path = file.path().to_str().unwrap().to_string();
         let config = default_config();
-        let result = check_files(&[path], &config);
+        let result = check_files(&[path], &config, &[]);
         assert!(result.is_ok());
     }
 
@@ -343,5 +348,59 @@ mod tests {
         assert_eq!(tier_for_score(50, &c).color, YELLOW);
         assert_eq!(tier_for_score(80, &c).color, ORANGE);
         assert_eq!(tier_for_score(100, &c).color, RED);
+    }
+
+    // --- Rule filter tests ---
+
+    #[test]
+    fn test_check_file_rule_filter_only_runs_matching_rule() {
+        // 300 lines triggers file-too-long, but if we filter to a different rule, no violations
+        let source = make_js_source(300);
+        let file = create_temp_js_file(&source);
+        let mut cache = AstCache::new();
+        let config = default_config();
+        let filter = vec!["nested-ternary".to_string()];
+        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config, &filter).unwrap();
+        assert_eq!(result.total_score, 0);
+        assert!(result.violations.is_empty());
+    }
+
+    #[test]
+    fn test_check_file_rule_filter_includes_matching_rule() {
+        // 300 lines triggers file-too-long, filtering to file-too-long should still find it
+        let source = make_js_source(300);
+        let file = create_temp_js_file(&source);
+        let mut cache = AstCache::new();
+        let config = default_config();
+        let filter = vec!["file-too-long".to_string()];
+        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config, &filter).unwrap();
+        assert_eq!(result.total_score, 20);
+        assert_eq!(result.violations.len(), 1);
+        assert_eq!(result.violations[0].rule_name, "file-too-long");
+    }
+
+    #[test]
+    fn test_check_file_empty_filter_runs_all_rules() {
+        // Empty filter should behave same as no filter — all rules run
+        let source = make_js_source(300);
+        let file = create_temp_js_file(&source);
+        let mut cache = AstCache::new();
+        let config = default_config();
+        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config, &[]).unwrap();
+        assert_eq!(result.total_score, 20);
+        assert_eq!(result.violations.len(), 1);
+    }
+
+    #[test]
+    fn test_check_file_multiple_filters() {
+        let source = make_js_source(300);
+        let file = create_temp_js_file(&source);
+        let mut cache = AstCache::new();
+        let config = default_config();
+        let filter = vec!["file-too-long".to_string(), "nested-ternary".to_string()];
+        let result = check_file(file.path().to_str().unwrap(), &mut cache, &config, &filter).unwrap();
+        // Only file-too-long fires (no nested ternaries in the source)
+        assert_eq!(result.violations.len(), 1);
+        assert_eq!(result.violations[0].rule_name, "file-too-long");
     }
 }

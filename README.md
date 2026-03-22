@@ -14,15 +14,18 @@ curl -fsSL https://raw.githubusercontent.com/azjgard/diaper/main/install.sh | ba
 
 ### Claude Code integration
 
-Install the stop hook so Claude automatically checks for violations before finishing:
+Install the Claude Code hooks:
 
 ```sh
-diaper install-hook
+diaper install-hooks
 ```
 
-This adds a [Stop hook](https://docs.anthropic.com/en/docs/claude-code/hooks) that runs `diaper check` against unstaged JavaScript files whenever Claude finishes a task. If there are unresolved violations, Claude is blocked from stopping and the violations are injected into context for it to fix. Claude can accept violations by running `touch /tmp/diaper-check-accept`.
+This installs two [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks):
 
-> **Note:** During the closed beta, the hook only runs in the `api-gateway` project.
+1. **Stop hook** — Runs `diaper check` against unstaged JavaScript files whenever Claude finishes a task. If there are unresolved violations, Claude is blocked from stopping and the violations are injected into context for it to fix. Claude can accept non-blowout violations by running `touch /tmp/diaper-check-accept`.
+2. **Pre-edit hook** — Before Claude edits a `.js` file, checks if the file has a sibling `index.spec.js`. If not, injects a reminder into Claude's context to consider adding tests. This does not block the edit.
+
+> **Note:** During the closed beta, both hooks only run in the `api-gateway` project.
 
 For the best experience, run Claude in bypass permissions mode so it can create the sentinel file without prompting:
 
@@ -47,6 +50,10 @@ diaper check
 
 # Check a specific file
 diaper check path/to/file.js
+
+# Only run specific rules
+diaper check --rule file-too-long --rule async-await
+diaper check -r file-too-long,async-await,nested-ternary
 
 # Check with JSON output (for tooling/agents)
 diaper check --json

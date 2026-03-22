@@ -73,41 +73,89 @@ else
   fail "expected exit code 0, got $CLEAN_EXIT" "$CLEAN_OUTPUT"
 fi
 
-# --- Test 6: install-hook creates hook script ---
-echo "[6] Install hook"
-"$DIAPER" install-hook
+# --- Test 6: install-hooks creates both hook scripts ---
+echo "[6] Install hooks"
+"$DIAPER" install-hooks
 
-HOOK_SCRIPT="$HOME/.claude/hooks/diaper-check.sh"
-if [ -x "$HOOK_SCRIPT" ]; then
-  pass "hook script exists and is executable"
+STOP_SCRIPT="$HOME/.claude/hooks/diaper-check.sh"
+PRE_EDIT_SCRIPT="$HOME/.claude/hooks/diaper-pre-edit.sh"
+
+if [ -x "$STOP_SCRIPT" ]; then
+  pass "stop hook script exists and is executable"
 else
-  fail "hook script not found or not executable" "expected $HOOK_SCRIPT"
+  fail "stop hook script not found or not executable" "expected $STOP_SCRIPT"
 fi
 
-# --- Test 7: Hook script contains expected content ---
-echo "[7] Hook script content"
-HOOK_CONTENT=$(cat "$HOOK_SCRIPT")
-
-if echo "$HOOK_CONTENT" | grep -q '#!/bin/bash'; then
-  pass "hook script has bash shebang"
+if [ -x "$PRE_EDIT_SCRIPT" ]; then
+  pass "pre-edit hook script exists and is executable"
 else
-  fail "missing shebang" "$HOOK_CONTENT"
+  fail "pre-edit hook script not found or not executable" "expected $PRE_EDIT_SCRIPT"
 fi
 
-if echo "$HOOK_CONTENT" | grep -q 'api-gateway'; then
-  pass "hook script checks for api-gateway"
+# --- Test 7: Stop hook script content ---
+echo "[7] Stop hook script content"
+STOP_CONTENT=$(cat "$STOP_SCRIPT")
+
+if echo "$STOP_CONTENT" | grep -q '#!/bin/bash'; then
+  pass "stop hook has bash shebang"
 else
-  fail "missing api-gateway check" "$HOOK_CONTENT"
+  fail "missing shebang" "$STOP_CONTENT"
 fi
 
-if echo "$HOOK_CONTENT" | grep -q '/tmp/diaper-check-accept'; then
-  pass "hook script has accept escape hatch"
+if echo "$STOP_CONTENT" | grep -q 'api-gateway'; then
+  pass "stop hook checks for api-gateway"
 else
-  fail "missing escape hatch" "$HOOK_CONTENT"
+  fail "missing api-gateway check" "$STOP_CONTENT"
 fi
 
-# --- Test 8: settings.json structure ---
-echo "[8] settings.json structure"
+if echo "$STOP_CONTENT" | grep -q '/tmp/diaper-check-accept'; then
+  pass "stop hook has accept escape hatch"
+else
+  fail "missing escape hatch" "$STOP_CONTENT"
+fi
+
+# --- Test 8: Pre-edit hook script content ---
+echo "[8] Pre-edit hook script content"
+PRE_EDIT_CONTENT=$(cat "$PRE_EDIT_SCRIPT")
+
+if echo "$PRE_EDIT_CONTENT" | grep -q '#!/bin/bash'; then
+  pass "pre-edit hook has bash shebang"
+else
+  fail "missing shebang" "$PRE_EDIT_CONTENT"
+fi
+
+if echo "$PRE_EDIT_CONTENT" | grep -q 'api-gateway'; then
+  pass "pre-edit hook checks for api-gateway"
+else
+  fail "missing api-gateway check" "$PRE_EDIT_CONTENT"
+fi
+
+if echo "$PRE_EDIT_CONTENT" | grep -q 'tool_input.file_path'; then
+  pass "pre-edit hook reads file path from stdin"
+else
+  fail "missing file_path extraction" "$PRE_EDIT_CONTENT"
+fi
+
+if echo "$PRE_EDIT_CONTENT" | grep -q '\-\-rule missing-test'; then
+  pass "pre-edit hook runs missing-test rule"
+else
+  fail "missing --rule missing-test" "$PRE_EDIT_CONTENT"
+fi
+
+if echo "$PRE_EDIT_CONTENT" | grep -q 'additionalContext'; then
+  pass "pre-edit hook uses additionalContext"
+else
+  fail "missing additionalContext" "$PRE_EDIT_CONTENT"
+fi
+
+if echo "$PRE_EDIT_CONTENT" | grep -q 'permissionDecision'; then
+  pass "pre-edit hook sets permissionDecision"
+else
+  fail "missing permissionDecision" "$PRE_EDIT_CONTENT"
+fi
+
+# --- Test 9: settings.json structure ---
+echo "[9] settings.json structure"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 
 if [ -f "$SETTINGS_FILE" ]; then
@@ -133,39 +181,88 @@ else
   fail "expected hooks.Stop to have 1 entry, got $STOP_COUNT" "$SETTINGS"
 fi
 
-# Verify the hook command references diaper-check.sh
-HOOK_CMD=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['hooks']['Stop'][0]['hooks'][0]['command'])" 2>&1)
-if echo "$HOOK_CMD" | grep -q 'diaper-check.sh'; then
-  pass "hook command references diaper-check.sh"
+# Verify the stop hook command references diaper-check.sh
+STOP_CMD=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['hooks']['Stop'][0]['hooks'][0]['command'])" 2>&1)
+if echo "$STOP_CMD" | grep -q 'diaper-check.sh'; then
+  pass "stop hook command references diaper-check.sh"
 else
-  fail "hook command doesn't reference diaper-check.sh" "$HOOK_CMD"
+  fail "stop hook command doesn't reference diaper-check.sh" "$STOP_CMD"
 fi
 
-# Verify statusMessage is set
+# Verify stop hook statusMessage
 STATUS_MSG=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['hooks']['Stop'][0]['hooks'][0]['statusMessage'])" 2>&1)
 if [ "$STATUS_MSG" = "Running diaper check..." ]; then
-  pass "hook has correct statusMessage"
+  pass "stop hook has correct statusMessage"
 else
   fail "unexpected statusMessage" "$STATUS_MSG"
 fi
 
-# Verify hook type is "command"
-HOOK_TYPE=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['hooks']['Stop'][0]['hooks'][0]['type'])" 2>&1)
-if [ "$HOOK_TYPE" = "command" ]; then
-  pass "hook type is 'command'"
+# Verify stop hook type is "command"
+STOP_TYPE=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['hooks']['Stop'][0]['hooks'][0]['type'])" 2>&1)
+if [ "$STOP_TYPE" = "command" ]; then
+  pass "stop hook type is 'command'"
 else
-  fail "expected hook type 'command', got '$HOOK_TYPE'" "$SETTINGS"
+  fail "expected hook type 'command', got '$STOP_TYPE'" "$SETTINGS"
 fi
 
-# --- Test 9: install-hook is idempotent ---
-echo "[9] Install hook idempotency"
-"$DIAPER" install-hook
+# --- Test 10: settings.json PreToolUse hook ---
+echo "[10] settings.json PreToolUse hook"
+
+PRE_COUNT=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['hooks']['PreToolUse']))" 2>&1)
+if [ "$PRE_COUNT" = "1" ]; then
+  pass "hooks.PreToolUse has exactly 1 entry"
+else
+  fail "expected hooks.PreToolUse to have 1 entry, got $PRE_COUNT" "$SETTINGS"
+fi
+
+# Verify matcher is Edit|Write|Bash
+PRE_MATCHER=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['hooks']['PreToolUse'][0]['matcher'])" 2>&1)
+if [ "$PRE_MATCHER" = "Edit|Write|Bash" ]; then
+  pass "pre-edit hook matcher is 'Edit|Write|Bash'"
+else
+  fail "expected matcher 'Edit|Write|Bash', got '$PRE_MATCHER'" "$SETTINGS"
+fi
+
+# Verify the pre-edit hook command references diaper-pre-edit.sh
+PRE_CMD=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['hooks']['PreToolUse'][0]['hooks'][0]['command'])" 2>&1)
+if echo "$PRE_CMD" | grep -q 'diaper-pre-edit.sh'; then
+  pass "pre-edit hook command references diaper-pre-edit.sh"
+else
+  fail "pre-edit hook command doesn't reference diaper-pre-edit.sh" "$PRE_CMD"
+fi
+
+# Verify pre-edit hook statusMessage
+PRE_STATUS=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['hooks']['PreToolUse'][0]['hooks'][0]['statusMessage'])" 2>&1)
+if [ "$PRE_STATUS" = "Checking for missing tests..." ]; then
+  pass "pre-edit hook has correct statusMessage"
+else
+  fail "unexpected statusMessage" "$PRE_STATUS"
+fi
+
+# Verify pre-edit hook type is "command"
+PRE_TYPE=$(echo "$SETTINGS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['hooks']['PreToolUse'][0]['hooks'][0]['type'])" 2>&1)
+if [ "$PRE_TYPE" = "command" ]; then
+  pass "pre-edit hook type is 'command'"
+else
+  fail "expected hook type 'command', got '$PRE_TYPE'" "$SETTINGS"
+fi
+
+# --- Test 11: install-hooks is idempotent ---
+echo "[11] Install hooks idempotency"
+"$DIAPER" install-hooks
 
 STOP_COUNT_AFTER=$(cat "$SETTINGS_FILE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['hooks']['Stop']))" 2>&1)
 if [ "$STOP_COUNT_AFTER" = "1" ]; then
-  pass "running install-hook twice doesn't duplicate the entry"
+  pass "running install-hooks twice doesn't duplicate Stop entry"
 else
   fail "expected 1 Stop entry after second install, got $STOP_COUNT_AFTER" "$(cat "$SETTINGS_FILE")"
+fi
+
+PRE_COUNT_AFTER=$(cat "$SETTINGS_FILE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['hooks']['PreToolUse']))" 2>&1)
+if [ "$PRE_COUNT_AFTER" = "1" ]; then
+  pass "running install-hooks twice doesn't duplicate PreToolUse entry"
+else
+  fail "expected 1 PreToolUse entry after second install, got $PRE_COUNT_AFTER" "$(cat "$SETTINGS_FILE")"
 fi
 
 # --- Summary ---

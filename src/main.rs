@@ -23,13 +23,16 @@ enum Commands {
         /// Output results as JSON
         #[arg(long)]
         json: bool,
+        /// Only run specific rules (repeatable or comma-separated)
+        #[arg(long = "rule", short = 'r', value_delimiter = ',')]
+        rules: Vec<String>,
     },
     /// Watch for file changes and re-run checks
     Watch,
     /// Generate a default diaper.yml config file
     Init,
-    /// Install Claude Code stop hook (blocks Claude on violations, use with claude --dangerously-skip-permissions)
-    InstallHook,
+    /// Install Claude Code hooks (stop hook + pre-edit test reminder)
+    InstallHooks,
     /// List all rules (or show details for a specific rule)
     Rules {
         /// Rule name to show details for
@@ -232,7 +235,7 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Check { path, json } => {
+        Commands::Check { path, json, rules: rule_filter } => {
             let config = match config::Config::load() {
                 Ok(c) => c,
                 Err(e) => {
@@ -240,6 +243,17 @@ fn main() {
                     std::process::exit(1);
                 }
             };
+
+            if !rule_filter.is_empty() {
+                let all = rules::all_rules();
+                for name in &rule_filter {
+                    if !all.iter().any(|r| r.name() == name.as_str()) {
+                        eprintln!("error: unknown rule '{name}'");
+                        eprintln!("Run 'diaper rules' to see all available rules.");
+                        std::process::exit(1);
+                    }
+                }
+            }
 
             let files = match path {
                 Some(p) => {
@@ -260,9 +274,9 @@ fn main() {
             };
 
             let result = if json {
-                check::check_files_json(&files, &config)
+                check::check_files_json(&files, &config, &rule_filter)
             } else {
-                check::check_files(&files, &config)
+                check::check_files(&files, &config, &rule_filter)
             };
 
             match result {
@@ -289,8 +303,8 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Commands::InstallHook => {
-            if let Err(e) = hook::install_hook() {
+        Commands::InstallHooks => {
+            if let Err(e) = hook::install_hooks() {
                 eprintln!("error: {e}");
                 std::process::exit(1);
             }
