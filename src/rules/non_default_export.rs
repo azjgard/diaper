@@ -101,6 +101,9 @@ fn collect_non_default_functions(
                 let fn_name = child.child_by_field_name("name")
                     .map(|n| &source[n.byte_range()])
                     .unwrap_or("anonymous");
+                if is_recursive_function(child, source, fn_name) {
+                    continue;
+                }
                 violations.push(RuleViolation {
                     rule_name: rule.name().to_string(),
                     doc_url: rule.doc_url().to_string(),
@@ -115,7 +118,10 @@ fn collect_non_default_functions(
                 if has_default {
                     continue;
                 }
-                if let Some(fn_name) = extract_function_from_export(child, source) {
+                if let Some((fn_name, fn_node)) = extract_function_from_export(child, source) {
+                    if is_recursive_function(fn_node, source, fn_name) {
+                        continue;
+                    }
                     violations.push(RuleViolation {
                         rule_name: rule.name().to_string(),
                         doc_url: rule.doc_url().to_string(),
@@ -127,7 +133,10 @@ fn collect_non_default_functions(
             }
             // Variable declaration with function: const foo = () => {}
             "lexical_declaration" | "variable_declaration" => {
-                if let Some(fn_name) = extract_function_from_var_decl(child, source) {
+                if let Some((fn_name, fn_node)) = extract_function_from_var_decl(child, source) {
+                    if is_recursive_function(fn_node, source, fn_name) {
+                        continue;
+                    }
                     violations.push(RuleViolation {
                         rule_name: rule.name().to_string(),
                         doc_url: rule.doc_url().to_string(),
@@ -142,14 +151,15 @@ fn collect_non_default_functions(
     }
 }
 
-/// Extract function name from a named export statement, if it contains a function.
-fn extract_function_from_export<'a>(node: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
+/// Extract function name and function node from a named export statement, if it contains a function.
+fn extract_function_from_export<'a>(node: tree_sitter::Node<'a>, source: &'a str) -> Option<(&'a str, tree_sitter::Node<'a>)> {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         match child.kind() {
             "function_declaration" | "generator_function_declaration" => {
-                return child.child_by_field_name("name")
-                    .map(|n| &source[n.byte_range()]);
+                let name = child.child_by_field_name("name")
+                    .map(|n| &source[n.byte_range()])?;
+                return Some((name, child));
             }
             "lexical_declaration" | "variable_declaration" => {
                 return extract_function_from_var_decl(child, source);
@@ -160,8 +170,8 @@ fn extract_function_from_export<'a>(node: tree_sitter::Node, source: &'a str) ->
     None
 }
 
-/// If a variable declaration assigns a function/arrow, return the variable name.
-fn extract_function_from_var_decl<'a>(node: tree_sitter::Node, source: &'a str) -> Option<&'a str> {
+/// If a variable declaration assigns a function/arrow, return the variable name and the function node.
+fn extract_function_from_var_decl<'a>(node: tree_sitter::Node<'a>, source: &'a str) -> Option<(&'a str, tree_sitter::Node<'a>)> {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
         if child.kind() == "variable_declarator" {
@@ -169,13 +179,13 @@ fn extract_function_from_var_decl<'a>(node: tree_sitter::Node, source: &'a str) 
             let value = child.child_by_field_name("value")?;
             match value.kind() {
                 "arrow_function" | "function" => {
-                    return Some(&source[name.byte_range()]);
+                    return Some((&source[name.byte_range()], value));
                 }
                 // Check for async arrow: the value might be the arrow_function itself
                 // or it could be wrapped
                 _ => {
                     if contains_function_node(value) {
-                        return Some(&source[name.byte_range()]);
+                        return Some((&source[name.byte_range()], value));
                     }
                 }
             }
@@ -198,6 +208,33 @@ fn contains_function_node(node: tree_sitter::Node) -> bool {
             false
         }
     }
+}
+
+/// Check if a function is recursive (calls itself by name in its body).
+fn is_recursive_function(node: tree_sitter::Node, source: &str, fn_name: &str) -> bool {
+    let body = match node.child_by_field_name("body") {
+        Some(b) => b,
+        None => return false,
+    };
+    body_calls_name(body, source, fn_name)
+}
+
+/// Recursively check if any call_expression in the subtree calls the given name.
+fn body_calls_name(node: tree_sitter::Node, source: &str, fn_name: &str) -> bool {
+    if node.kind() == "call_expression" {
+        if let Some(func) = node.child_by_field_name("function") {
+            if func.kind() == "identifier" && &source[func.byte_range()] == fn_name {
+                return true;
+            }
+        }
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if body_calls_name(child, source, fn_name) {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -314,6 +351,45 @@ mod tests {
         let source = "function a() {}\nfunction b() {}\nconst c = () => {};";
         let violations = check(source);
         assert_eq!(violations.len(), 3);
+    }
+
+    // --- OK: recursive functions ---
+
+    #[test]
+    fn test_recursive_function_declaration() {
+        let violations = check("function factorial(n) { return n <= 1 ? 1 : n * factorial(n - 1); }");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_recursive_function_alongside_default_export() {
+        let source = "function traverse(node) { node.children.forEach(c => traverse(c)); }\nexport default function main() {}";
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_recursive_const_function() {
+        let violations = check("const fib = function fib(n) { return n <= 1 ? n : fib(n - 1) + fib(n - 2); };");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_recursive_exported_function() {
+        let violations = check("export function walk(node) { node.children.forEach(c => walk(c)); }");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_recursive_arrow_function() {
+        let violations = check("const countdown = (n) => { if (n > 0) countdown(n - 1); };");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_non_recursive_still_flagged() {
+        let violations = check("function helper() { return 42; }");
+        assert_eq!(violations.len(), 1);
     }
 
     // --- OK (no violations) ---
