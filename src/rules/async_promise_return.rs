@@ -114,12 +114,17 @@ fn find_non_promise_returns(
                 .trim();
 
             let is_call = return_value_is_call(node);
+            let short_value = if returned_value.len() > 40 {
+                format!("{}...", &returned_value[..37])
+            } else {
+                returned_value.to_string()
+            };
             let fix_suggestion = if is_call {
                 format!(
-                    "either wrap in Promise.resolve(): return Promise.resolve({returned_value}) — or if {returned_value} is already async, rename it with an Async suffix"
+                    "either wrap in Promise.resolve(): return Promise.resolve({short_value}) — or if the callee is already async, rename it with an Async suffix"
                 )
             } else {
-                format!("wrap in Promise.resolve(): return Promise.resolve({returned_value})")
+                format!("wrap in Promise.resolve(): return Promise.resolve({short_value})")
             };
 
             violations.push(RuleViolation {
@@ -359,6 +364,18 @@ mod tests {
         assert!(violations[0].fix_suggestion.contains("Promise.resolve"));
         assert!(violations[0].fix_suggestion.contains("rename"));
         assert!(violations[0].fix_suggestion.contains("Async"));
+    }
+
+    #[test]
+    fn test_long_return_value_truncated_in_suggestion() {
+        let source = r#"export default (ctx) => {
+            return someService.processData({ userId: ctx.userId, orgId: ctx.orgId, extra: ctx.extra });
+        };"#;
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+        // The fix suggestion should truncate the verbose value
+        assert!(violations[0].fix_suggestion.contains("..."));
+        assert!(violations[0].fix_suggestion.len() < 200);
     }
 
     #[test]
