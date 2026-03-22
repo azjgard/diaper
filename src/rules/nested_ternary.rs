@@ -81,39 +81,52 @@ fn collect_nested_ternaries(
 }
 
 /// Count how many levels of ternary nesting exist from this node down.
+/// Only counts nesting through direct consequence/alternative branches,
+/// not through nested sub-expressions (objects, arrays, function args, etc.).
 fn count_ternary_depth(node: tree_sitter::Node) -> u32 {
     if node.kind() != "ternary_expression" {
         return 0;
     }
 
-    let mut max_child_depth = 0;
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        let child_depth = find_max_ternary_depth(child);
-        if child_depth > max_child_depth {
-            max_child_depth = child_depth;
+    let mut max_branch_depth = 0;
+
+    // Only check the consequence and alternative branches for nested ternaries
+    if let Some(consequence) = node.child_by_field_name("consequence") {
+        let depth = direct_ternary_depth(consequence);
+        if depth > max_branch_depth {
+            max_branch_depth = depth;
+        }
+    }
+    if let Some(alternative) = node.child_by_field_name("alternative") {
+        let depth = direct_ternary_depth(alternative);
+        if depth > max_branch_depth {
+            max_branch_depth = depth;
         }
     }
 
-    1 + max_child_depth
+    1 + max_branch_depth
 }
 
-/// Find the maximum ternary depth in any descendant.
-fn find_max_ternary_depth(node: tree_sitter::Node) -> u32 {
+/// Get the ternary depth of a branch node. If the branch itself is a ternary,
+/// count it. Otherwise return 0 — we don't recurse into nested expressions
+/// like objects, arrays, or function calls.
+fn direct_ternary_depth(node: tree_sitter::Node) -> u32 {
+    // Unwrap parenthesized expressions
+    if node.kind() == "parenthesized_expression" {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() != "(" && child.kind() != ")" {
+                return direct_ternary_depth(child);
+            }
+        }
+        return 0;
+    }
+
     if node.kind() == "ternary_expression" {
         return count_ternary_depth(node);
     }
 
-    let mut max_depth = 0;
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        let depth = find_max_ternary_depth(child);
-        if depth > max_depth {
-            max_depth = depth;
-        }
-    }
-
-    max_depth
+    0
 }
 
 /// Mark all ternary_expression descendants as visited.
@@ -222,6 +235,44 @@ mod tests {
         let violations = check(source);
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].score, 60);
+    }
+
+    // --- Ternary in nested expression (not a violation) ---
+
+    #[test]
+    fn test_ternary_inside_object_in_ternary_branch() {
+        let violations = check("const bbb = a ? {b: c ? d : e} : {e: f};");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_ternary_inside_array_in_ternary_branch() {
+        let violations = check("const x = a ? [c ? d : e] : [];");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_ternary_inside_spread_in_ternary_branch() {
+        let source = r#"const x = {
+            ...(tabapayTransaction.failureCode
+                ? [
+                        [
+                            { label: "Failure code", value: tabapayTransaction.failureCode },
+                            ...(input.reportTransaction.failureDescription
+                                ? [{ label: "Failure description", value: input.reportTransaction.failureDescription }]
+                                : []),
+                        ],
+                    ]
+                : []),
+        };"#;
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_ternary_in_function_call_in_ternary_branch() {
+        let violations = check("const x = a ? foo(b ? c : d) : e;");
+        assert!(violations.is_empty());
     }
 
     // --- No violations ---
