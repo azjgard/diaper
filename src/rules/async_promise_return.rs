@@ -113,12 +113,21 @@ fn find_non_promise_returns(
                 .unwrap_or("value")
                 .trim();
 
+            let is_call = return_value_is_call(node);
+            let fix_suggestion = if is_call {
+                format!(
+                    "either wrap in Promise.resolve(): return Promise.resolve({returned_value}) — or if {returned_value} is already async, rename it with an Async suffix"
+                )
+            } else {
+                format!("wrap in Promise.resolve(): return Promise.resolve({returned_value})")
+            };
+
             violations.push(RuleViolation {
                 rule_name: rule.name().to_string(),
                 doc_url: rule.doc_url().to_string(),
                 score,
                 code_sample: line.trim().to_string(),
-                fix_suggestion: format!("wrap in Promise.resolve(): return Promise.resolve({returned_value})"),
+                fix_suggestion,
             });
         }
         // Don't recurse into return statement children
@@ -141,6 +150,17 @@ fn find_non_promise_returns(
     for child in node.children(&mut cursor) {
         find_non_promise_returns(child, source, violations, rule, score, inside_then);
     }
+}
+
+/// Check if a return statement's value is a function call.
+fn return_value_is_call(node: tree_sitter::Node) -> bool {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "call_expression" {
+            return true;
+        }
+    }
+    false
 }
 
 /// Check if a node is a .then() call's callback argument.
@@ -194,9 +214,34 @@ fn returns_promise(node: tree_sitter::Node, source: &str) -> bool {
         if has_then_chain(child, source) {
             return true;
         }
+        // Check if it returns a call ending in Async() (e.g. someService.fetchDataAsync())
+        if returns_async_call(child, source) {
+            return true;
+        }
     }
 
     false
+}
+
+/// Check if a node is a call expression whose function name ends with "Async".
+/// Handles both `fooAsync()` and `some.object.methodAsync()`.
+fn returns_async_call(node: tree_sitter::Node, source: &str) -> bool {
+    if node.kind() != "call_expression" {
+        return false;
+    }
+    let func = match node.child_by_field_name("function") {
+        Some(f) => f,
+        None => return false,
+    };
+    let name_node = match func.kind() {
+        "member_expression" => func.child_by_field_name("property"),
+        "identifier" => Some(func),
+        _ => None,
+    };
+    match name_node {
+        Some(n) => source[n.byte_range()].ends_with("Async"),
+        None => false,
+    }
 }
 
 /// Recursively check if a node contains a .then() chain.
@@ -296,6 +341,38 @@ mod tests {
         assert_eq!(violations.len(), 1);
     }
 
+    #[test]
+    fn test_return_non_async_call_flagged() {
+        let source = r#"export default (ctx) => {
+            return someService.processData(ctx);
+        };"#;
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn test_return_non_async_call_suggests_rename_or_wrap() {
+        let source = r#"export default (ctx) => {
+            return someService.processData(ctx);
+        };"#;
+        let violations = check(source);
+        assert!(violations[0].fix_suggestion.contains("Promise.resolve"));
+        assert!(violations[0].fix_suggestion.contains("rename"));
+        assert!(violations[0].fix_suggestion.contains("Async"));
+    }
+
+    #[test]
+    fn test_return_value_suggests_only_wrap() {
+        let source = r#"export default (ctx) => {
+            if (!ctx.ready) return ctx;
+            return Model.update({}).then(() => ctx);
+        };"#;
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].fix_suggestion.contains("Promise.resolve"));
+        assert!(!violations[0].fix_suggestion.contains("rename"));
+    }
+
     // --- No violations ---
 
     #[test]
@@ -354,6 +431,45 @@ mod tests {
         };"#;
         let violations = check(source);
         assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_return_async_suffixed_call_not_flagged() {
+        let source = r#"export default (ctx) => {
+            return someService.processDataAsync(ctx);
+        };"#;
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_return_async_suffixed_member_call_not_flagged() {
+        let source = r#"export default (ctx) => {
+            return some.deeply.nested.object.fetchAsync();
+        };"#;
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_return_async_suffixed_bare_call_not_flagged() {
+        let source = r#"export default (ctx) => {
+            return processDataAsync(ctx);
+        };"#;
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_return_async_suffixed_among_other_returns() {
+        // Async call is fine, but early return of ctx is still flagged
+        let source = r#"export default (ctx) => {
+            if (!ctx.ready) return ctx;
+            return someService.processDataAsync(ctx);
+        };"#;
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].code_sample.contains("return ctx"));
     }
 
     #[test]
