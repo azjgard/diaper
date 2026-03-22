@@ -201,9 +201,9 @@ mod tests {
     }
 
     #[test]
-    fn test_tests_without_factories_not_excluded() {
+    fn test_tests_dir_excluded() {
         let violations = check_with_path("async function foo() {}", "src/tests/helper.js");
-        assert_eq!(violations.len(), 1);
+        assert!(violations.is_empty());
     }
 
     #[test]

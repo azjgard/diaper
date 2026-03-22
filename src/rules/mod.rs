@@ -62,13 +62,13 @@ pub trait Rule {
 }
 
 /// Returns true if the file should be skipped by most rules.
-/// Skips index.spec.js files and files in /migrations/ paths.
+/// Skips index.spec.js files, files in /migrations/ paths, and files in src/tests/.
 pub fn is_excluded_file(path: &Path) -> bool {
     if path.file_name().is_some_and(|f| f == "index.spec.js") {
         return true;
     }
     let path_str = path.to_string_lossy();
-    if path_str.contains("/migrations") {
+    if path_str.contains("/migrations") || path_str.contains("src/tests") {
         return true;
     }
     false
