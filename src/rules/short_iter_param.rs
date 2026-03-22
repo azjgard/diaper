@@ -106,7 +106,7 @@ fn check_callback_param(
                 if param_name == "_" {
                     // Convention for intentionally unused params
                 } else if param_name.len() <= MAX_SHORT_LENGTH {
-                    let line = source.lines().nth(call_node.start_position().row).unwrap_or("");
+                    let line = source.lines().nth(callback.start_position().row).unwrap_or("");
                     violations.push(RuleViolation {
                         rule_name: rule.name().to_string(),
                         doc_url: rule.doc_url().to_string(),
@@ -394,6 +394,18 @@ mod tests {
 });"#;
         let violations = check(source);
         assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn test_multiline_chain_code_sample_shows_callback_line() {
+        let source = r#"return (response?.data?.choices?.[0]?.message?.content || "")
+    .split('\n')
+    .filter((n) => n.trim() !== '');"#;
+        let violations = check(source);
+        assert_eq!(violations.len(), 1);
+        // Code sample should show the line with the callback, not the first line of the chain
+        assert!(violations[0].code_sample.contains("filter"));
+        assert!(violations[0].code_sample.contains("(n)"));
     }
 
     #[test]
