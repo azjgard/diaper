@@ -63,7 +63,9 @@ fn is_sql_keyword(word: &str) -> bool {
 }
 
 fn looks_like_sql(text: &str) -> bool {
-    sql_detect_regex().is_match(text)
+    // Require at least 2 SQL keywords to reduce false positives on natural language
+    // strings that happen to contain "from" or "select".
+    sql_detect_regex().find_iter(text).count() >= 2
 }
 
 fn extract_string_text(node: tree_sitter::Node, source: &str) -> String {
@@ -193,11 +195,15 @@ impl Rule for SqlTableAlias {
     fn check(
         &self,
         source: &str,
-        _path: &Path,
+        path: &Path,
         tree: &tree_sitter::Tree,
         _cache: &mut super::AstCache,
         config: &crate::config::Config,
     ) -> Vec<RuleViolation> {
+        if super::is_excluded_file(path) {
+            return vec![];
+        }
+
         let score = config.rule_score("sql-table-alias", SCORE_PER_VIOLATION);
         let mut violations = Vec::new();
         collect_violations(tree.root_node(), source, &mut violations, self, score);
@@ -317,6 +323,38 @@ mod tests {
     #[test]
     fn test_from_followed_by_join_not_alias() {
         let violations = check(r#"const q = "SELECT * FROM users JOIN orders ON orders.user_id = users.id";"#);
+        assert!(violations.is_empty());
+    }
+
+    // --- Excluded paths ---
+
+    #[test]
+    fn test_spec_file_excluded() {
+        let tree = parse_js(r#"const q = "SELECT * FROM users u";"#).unwrap();
+        let mut cache = super::super::AstCache::new();
+        let config = crate::config::Config::default();
+        let violations = SqlTableAlias.check(
+            r#"const q = "SELECT * FROM users u";"#,
+            Path::new("src/index.spec.js"),
+            &tree, &mut cache, &config,
+        );
+        assert!(violations.is_empty());
+    }
+
+    // --- False positive prevention ---
+
+    #[test]
+    fn test_natural_language_with_from_not_flagged() {
+        let violations = check(r#"const msg = "returns campaigns from response data";"#);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_test_description_with_from_not_flagged() {
+        let source = r#"it("returns campaigns from response data", async () => {
+            const { data } = await listCampaigns();
+        });"#;
+        let violations = check(source);
         assert!(violations.is_empty());
     }
 
