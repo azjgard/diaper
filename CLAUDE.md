@@ -22,6 +22,24 @@ A fast CLI tool for parsing JavaScript files, built with Rust and tree-sitter.
 
 See [RULE_CREATION_INSTRUCTIONS.md](RULE_CREATION_INSTRUCTIONS.md) for step-by-step instructions on creating new rules, including file structure, conventions, registration, testing requirements, and a checklist.
 
+## Releases
+
+Use `scripts/release.sh <version>` to cut a release. It bumps `Cargo.toml`, commits, tags, pushes, builds macOS + Linux binaries, and creates a GitHub release.
+
+```sh
+bash scripts/release.sh 0.4.0-beta
+```
+
+After the release is created, update the auto-generated release notes to match the format of prior releases. Organize changes into sections:
+
+- **New Features** — New CLI flags, commands, or user-facing capabilities
+- **New Rules** — New rules with name, default score, and one-line description
+- **Rule Changes** — Behavioral changes to existing rules (exclusions, renames, scope changes)
+- **Bug Fixes & Docs** — Corrections to rule behavior or examples
+- **Infrastructure** — Build, CI, e2e, or internal tooling changes
+
+End with a **Full Changelog** link comparing the previous tag to the new one. Use `gh release edit <tag> --notes "..."` to update.
+
 ## Tech Stack
 
 - Rust
