@@ -6,6 +6,7 @@ pub mod file_too_long;
 pub mod graphql_type_export;
 pub mod missing_test;
 pub mod mock_models;
+pub mod new_date;
 pub mod non_default_export;
 pub mod non_idempotent_migration;
 pub mod pipe_property_init;
@@ -126,6 +127,7 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(graphql_type_export::GraphqlTypeExport),
         Box::new(missing_test::MissingTest),
         Box::new(mock_models::MockModels),
+        Box::new(new_date::NewDate),
         Box::new(non_default_export::NonDefaultExport),
         Box::new(non_idempotent_migration::NonIdempotentMigration),
         Box::new(pipe_property_init::PipePropertyInit),
