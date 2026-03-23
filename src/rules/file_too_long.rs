@@ -63,7 +63,7 @@ impl Rule for FileTooLong {
             rule_name: self.name().to_string(),
             doc_url: self.doc_url().to_string(),
             score,
-            code_sample: format!("{line_count} lines"),
+            code_sample: String::new(),
             fix_suggestion: format!("split file into smaller modules (currently {line_count} lines, threshold {THRESHOLD})"),
         }]
     }
