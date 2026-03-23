@@ -1,4 +1,5 @@
 pub mod async_await;
+pub mod async_directory_name;
 pub mod async_promise_return;
 pub mod ctx_destructure;
 pub mod distinct_array;
@@ -12,6 +13,7 @@ pub mod non_idempotent_migration;
 pub mod pipe_property_init;
 pub mod reduce_param_name;
 pub mod require_query_attributes;
+pub mod sequelize_plain_get;
 pub mod short_iter_param;
 pub mod nested_ternary;
 pub mod sql_table_alias;
@@ -120,6 +122,7 @@ impl AstCache {
 pub fn all_rules() -> Vec<Box<dyn Rule>> {
     vec![
         Box::new(async_await::AsyncAwait),
+        Box::new(async_directory_name::AsyncDirectoryName),
         Box::new(async_promise_return::AsyncPromiseReturn),
         Box::new(ctx_destructure::CtxDestructure),
         Box::new(distinct_array::DistinctArray),
@@ -133,6 +136,7 @@ pub fn all_rules() -> Vec<Box<dyn Rule>> {
         Box::new(pipe_property_init::PipePropertyInit),
         Box::new(reduce_param_name::ReduceParamName),
         Box::new(require_query_attributes::RequireQueryAttributes),
+        Box::new(sequelize_plain_get::SequelizePlainGet),
         Box::new(short_iter_param::ShortIterParam),
         Box::new(nested_ternary::NestedTernary),
         Box::new(sql_table_alias::SqlTableAlias),

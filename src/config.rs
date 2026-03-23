@@ -59,6 +59,7 @@ pub const DEFAULT_BLOWOUT_MIN: u32 = 100;
 
 /// Default rule scores.
 pub const DEFAULT_ASYNC_AWAIT: u32 = 100;
+pub const DEFAULT_ASYNC_DIRECTORY_NAME: u32 = 50;
 pub const DEFAULT_ASYNC_PROMISE_RETURN: u32 = 15;
 pub const DEFAULT_CTX_DESTRUCTURE: u32 = 10;
 pub const DEFAULT_DISTINCT_ARRAY: u32 = 20;
@@ -76,6 +77,7 @@ pub const DEFAULT_UPWARD_RELATIVE_IMPORT: u32 = 100;
 pub const DEFAULT_PIPE_PROPERTY_INIT: u32 = 100;
 pub const DEFAULT_REDUCE_PARAM_NAME: u32 = 70;
 pub const DEFAULT_REQUIRE_QUERY_ATTRIBUTES: u32 = 10;
+pub const DEFAULT_SEQUELIZE_PLAIN_GET: u32 = 25;
 pub const DEFAULT_SHORT_ITER_PARAM: u32 = 15;
 
 impl Config {
@@ -135,6 +137,7 @@ pub fn generate_default_config() -> String {
 
 rules:
   async-await: {DEFAULT_ASYNC_AWAIT}
+  async-directory-name: {DEFAULT_ASYNC_DIRECTORY_NAME}
   async-promise-return: {DEFAULT_ASYNC_PROMISE_RETURN}
   ctx-destructure: {DEFAULT_CTX_DESTRUCTURE}
   distinct-array: {DEFAULT_DISTINCT_ARRAY}
@@ -151,6 +154,7 @@ rules:
   pipe-property-init: {DEFAULT_PIPE_PROPERTY_INIT}
   reduce-param-name: {DEFAULT_REDUCE_PARAM_NAME}
   require-query-attributes: {DEFAULT_REQUIRE_QUERY_ATTRIBUTES}
+  sequelize-plain-get: {DEFAULT_SEQUELIZE_PLAIN_GET}
   short-iter-param: {DEFAULT_SHORT_ITER_PARAM}
   sql-table-alias: {DEFAULT_SQL_TABLE_ALIAS}
 
