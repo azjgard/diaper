@@ -1,6 +1,6 @@
 [package]
 name = "diaper"
-version = "0.3.2-beta"
+version = "0.3.3-beta"
 edition = "2024"
 
 [dependencies]
