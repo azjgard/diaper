@@ -110,6 +110,7 @@ Each violation shows: score, rule name, code sample, fix suggestion (green), and
 | `file-too-long` | 10 per 50 lines over 200 | Files over 200 lines accumulate stink |
 | `graphql-type-export` | 100 per type | GraphQL types not using default export in type files |
 | `missing-test` | 50 per file | Files with functions or logic missing a sibling `index.spec.js` |
+| `mock-models` | 100 per mock | `jest.mock("#models", ...)` in `index.spec.js` files |
 | `nested-ternary` | 60 per nested ternary | Nested ternary expressions (2+ levels deep) |
 | `non-default-export` | 50 per function | Any function that isn't the default export |
 | `non-idempotent-migration` | 50 per call | `addColumn`/`removeColumn` in migrations |
@@ -121,7 +122,7 @@ Each violation shows: score, rule name, code sample, fix suggestion (green), and
 | `unsorted-string-array` | 5 per array | String arrays not in alphabetical order |
 | `upward-relative-import` | 100 per import | Imports using `../` paths (unless path contains "shared") |
 
-All rules exclude `index.spec.js` and `/migrations/` paths. Every rule includes a fix suggestion and documentation link.
+Most rules exclude `index.spec.js` and `/migrations/` paths. Exceptions: `mock-models` only runs on `index.spec.js`, `non-idempotent-migration` only runs on migration files. Every rule includes a fix suggestion and documentation link.
 
 ## Configuration
 
@@ -134,6 +135,7 @@ rules:
   ctx-destructure: 10
   file-too-long: 10
   graphql-type-export: 100
+  mock-models: 100
   non-default-export: 50
   non-idempotent-migration: 50
   pipe-property-init: 100
