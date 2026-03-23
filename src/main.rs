@@ -34,6 +34,8 @@ enum Commands {
     Init,
     /// Install Claude Code hooks (stop hook + pre-edit test reminder)
     InstallHooks,
+    /// Update diaper to the latest version
+    Update,
     /// List all rules (or show details for a specific rule)
     Rules {
         /// Rule name to show details for
@@ -306,6 +308,12 @@ fn run() -> i32 {
         }
         Commands::InstallHooks => {
             if let Err(e) = hook::install_hooks() {
+                eprintln!("error: {e}");
+                return 1;
+            }
+        }
+        Commands::Update => {
+            if let Err(e) = version_check::update() {
                 eprintln!("error: {e}");
                 return 1;
             }

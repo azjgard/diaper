@@ -1,9 +1,11 @@
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 const REPO: &str = "azjgard/diaper";
+const INSTALL_URL: &str = "https://raw.githubusercontent.com/azjgard/diaper/main/install.sh";
 const STATE_FILE: &str = "latest-version";
+const GREEN: &str = "\x1b[32m";
 const YELLOW: &str = "\x1b[33m";
 const BOLD: &str = "\x1b[1m";
 const RESET: &str = "\x1b[0m";
@@ -56,9 +58,30 @@ pub fn print_update_notice() {
     let current = env!("CARGO_PKG_VERSION");
     if latest != current {
         eprintln!();
-        eprintln!("{YELLOW}{BOLD}Update available:{RESET}{YELLOW} v{current} -> v{latest}{RESET}");
-        eprintln!("{YELLOW}Run: curl -fsSL https://raw.githubusercontent.com/{REPO}/main/install.sh | bash{RESET}");
+        eprintln!("{BOLD}Update available:{RESET} {YELLOW}v{current}{RESET} -> {GREEN}v{latest}{RESET}");
+        eprintln!("Run {BOLD}diaper update{RESET} to install the latest version.");
     }
+}
+
+/// Run the install script to update diaper to the latest version.
+pub fn update() -> Result<(), String> {
+    println!("Updating diaper...");
+    println!();
+
+    let status = Command::new("bash")
+        .arg("-c")
+        .arg(format!("curl -fsSL {INSTALL_URL} | bash"))
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|e| format!("failed to run install script: {e}"))?;
+
+    if !status.success() {
+        return Err("install script failed".to_string());
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
