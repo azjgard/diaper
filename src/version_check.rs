@@ -63,23 +63,56 @@ pub fn print_update_notice() {
     }
 }
 
-/// Run the install script to update diaper to the latest version.
+/// Fetch the latest release version from GitHub synchronously.
+fn fetch_latest_version() -> Result<String, String> {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            r#"curl -sL "https://api.github.com/repos/{REPO}/releases/latest" | grep '"tag_name"' | head -1 | cut -d '"' -f 4 | sed 's/^v//'"#
+        ))
+        .output()
+        .map_err(|e| format!("failed to fetch latest version: {e}"))?;
+
+    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if version.is_empty() {
+        return Err("could not determine latest version".to_string());
+    }
+    Ok(version)
+}
+
+/// Update diaper to the latest version.
 pub fn update() -> Result<(), String> {
-    println!("Updating diaper...");
+    let current = env!("CARGO_PKG_VERSION");
+
+    print!("Checking for updates... ");
+    let latest = fetch_latest_version()?;
+
+    if latest == current {
+        println!("{GREEN}Already up to date ✅{RESET}");
+        return Ok(());
+    }
+
+    println!("updating {YELLOW}v{current}{RESET} -> {GREEN}v{latest}{RESET}");
     println!();
 
-    let status = Command::new("bash")
+    let output = Command::new("bash")
         .arg("-c")
         .arg(format!("curl -fsSL {INSTALL_URL} | bash"))
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
         .stderr(Stdio::inherit())
-        .status()
+        .output()
         .map_err(|e| format!("failed to run install script: {e}"))?;
 
-    if !status.success() {
+    if !output.status.success() {
         return Err("install script failed".to_string());
     }
+
+    // Update the state file so the next run doesn't show an update notice
+    let _ = fs::write(state_file_path(), &latest);
+
+    println!("Updated to {GREEN}{BOLD}v{latest}{RESET}");
+    println!("Release notes: https://github.com/{REPO}/releases/tag/v{latest}");
 
     Ok(())
 }
