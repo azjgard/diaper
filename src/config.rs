@@ -13,18 +13,20 @@ const CONFIG_FILE: &str = "diaper.yml";
 pub enum RuleConfig {
     /// Just a score: `async-await: 100`
     Score(u32),
-    /// Score with optional docs: `async-await: { score: 100, docs: "./docs/async-await.md" }`
+    /// Object form: `async-await: { score: 100, docs: "./docs/async-await.md" }`
+    /// Both score and docs are optional.
     Full {
-        score: u32,
+        #[serde(default)]
+        score: Option<u32>,
         #[serde(default)]
         docs: Option<String>,
     },
 }
 
 impl RuleConfig {
-    pub fn score(&self) -> u32 {
+    pub fn score(&self) -> Option<u32> {
         match self {
-            RuleConfig::Score(s) => *s,
+            RuleConfig::Score(s) => Some(*s),
             RuleConfig::Full { score, .. } => *score,
         }
     }
@@ -96,7 +98,7 @@ impl Config {
 
     /// Get the score for a rule, falling back to the provided default.
     pub fn rule_score(&self, rule_name: &str, default: u32) -> u32 {
-        self.rules.get(rule_name).map(|r| r.score()).unwrap_or(default)
+        self.rules.get(rule_name).and_then(|r| r.score()).unwrap_or(default)
     }
 
     /// Get the docs path for a rule, if configured.
@@ -204,7 +206,7 @@ mod tests {
     fn test_rule_score_full_config() {
         let mut config = Config::default();
         config.rules.insert("async-await".to_string(), RuleConfig::Full {
-            score: 75,
+            score: Some(75),
             docs: Some("./docs/async.md".to_string()),
         });
         assert_eq!(config.rule_score("async-await", 100), 75);
@@ -227,7 +229,7 @@ mod tests {
     fn test_rule_docs_with_path() {
         let mut config = Config::default();
         config.rules.insert("async-await".to_string(), RuleConfig::Full {
-            score: 100,
+            score: Some(100),
             docs: Some("./docs/async-await.md".to_string()),
         });
         assert_eq!(config.rule_docs("async-await").unwrap(), "./docs/async-await.md");
@@ -237,7 +239,7 @@ mod tests {
     fn test_rule_docs_full_without_docs() {
         let mut config = Config::default();
         config.rules.insert("async-await".to_string(), RuleConfig::Full {
-            score: 100,
+            score: Some(100),
             docs: None,
         });
         assert!(config.rule_docs("async-await").is_none());
@@ -298,6 +300,42 @@ rules:
         assert!(config.rule_docs("async-await").is_none());
         assert_eq!(config.rule_score("file-too-long", 10), 5);
         assert_eq!(config.rule_docs("file-too-long").unwrap(), "./docs/file-too-long.md");
+    }
+
+    #[test]
+    fn test_parse_yaml_docs_only() {
+        let yaml = r#"
+rules:
+  non-default-export:
+    docs: ./.claude/skills/simplify-multi-function-file/SKILL.md
+  missing-test:
+    docs: ./.claude/skills/tests/SKILL.md
+"#;
+        let config: Config = serde_yaml::from_str(yaml).unwrap();
+        // Score falls back to default when not specified
+        assert_eq!(config.rule_score("non-default-export", 50), 50);
+        assert_eq!(config.rule_docs("non-default-export").unwrap(), "./.claude/skills/simplify-multi-function-file/SKILL.md");
+        assert_eq!(config.rule_score("missing-test", 50), 50);
+        assert_eq!(config.rule_docs("missing-test").unwrap(), "./.claude/skills/tests/SKILL.md");
+    }
+
+    #[test]
+    fn test_parse_yaml_docs_only_mixed_with_scores() {
+        let yaml = r#"
+rules:
+  async-await: 100
+  non-default-export:
+    docs: ./docs/non-default-export.md
+  pipe-property-init:
+    score: 200
+    docs: ./docs/pipes.md
+"#;
+        let config: Config = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.rule_score("async-await", 100), 100);
+        assert_eq!(config.rule_score("non-default-export", 50), 50);
+        assert_eq!(config.rule_docs("non-default-export").unwrap(), "./docs/non-default-export.md");
+        assert_eq!(config.rule_score("pipe-property-init", 100), 200);
+        assert_eq!(config.rule_docs("pipe-property-init").unwrap(), "./docs/pipes.md");
     }
 
     #[test]
