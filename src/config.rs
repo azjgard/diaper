@@ -63,6 +63,7 @@ pub const DEFAULT_DISTINCT_ARRAY: u32 = 20;
 pub const DEFAULT_FILE_TOO_LONG: u32 = 10;
 pub const DEFAULT_GRAPHQL_TYPE_EXPORT: u32 = 100;
 pub const DEFAULT_MISSING_TEST: u32 = 50;
+pub const DEFAULT_MOCK_MODELS: u32 = 100;
 pub const DEFAULT_NON_DEFAULT_EXPORT: u32 = 50;
 pub const DEFAULT_NON_IDEMPOTENT_MIGRATION: u32 = 50;
 pub const DEFAULT_TERNARY_NESTED: u32 = 60;
@@ -137,6 +138,7 @@ rules:
   file-too-long: {DEFAULT_FILE_TOO_LONG}
   graphql-type-export: {DEFAULT_GRAPHQL_TYPE_EXPORT}
   missing-test: {DEFAULT_MISSING_TEST}
+  mock-models: {DEFAULT_MOCK_MODELS}
   non-default-export: {DEFAULT_NON_DEFAULT_EXPORT}
   non-idempotent-migration: {DEFAULT_NON_IDEMPOTENT_MIGRATION}
   ternary-nested: {DEFAULT_TERNARY_NESTED}
