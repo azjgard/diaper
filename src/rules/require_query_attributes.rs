@@ -314,7 +314,7 @@ fn validate_query_object(
             }
             return;
         }
-        Some(n) => extract_string_array(n, source),
+        Some(n) => resolve_attributes(n, source, external_attrs),
     };
 
     let attrs_set: HashSet<&str> = attrs.iter().map(|s| s.as_str()).collect();
@@ -401,6 +401,31 @@ fn extract_include_model_name<'a>(obj: tree_sitter::Node, source: &'a str) -> Op
         }
     }
     None
+}
+
+/// Resolve an attributes value to a list of attribute names.
+/// Handles array literals (["id", "name"]) and member expressions
+/// (attributes.competition) by looking up the key in external_attrs.
+fn resolve_attributes(
+    node: tree_sitter::Node,
+    source: &str,
+    external_attrs: &HashMap<String, Vec<String>>,
+) -> Vec<String> {
+    if node.kind() == "array" {
+        return extract_string_array(node, source);
+    }
+
+    // Handle member expressions like `attributes.competition`
+    if node.kind() == "member_expression" {
+        if let Some(prop) = node.child_by_field_name("property") {
+            let key = &source[prop.byte_range()];
+            if let Some(attrs) = external_attrs.get(key) {
+                return attrs.clone();
+            }
+        }
+    }
+
+    Vec::new()
 }
 
 /// Extract string values from an array node.
@@ -735,19 +760,19 @@ User.findOne({
     // --- Cross-file attributes ---
 
     #[test]
-    fn test_external_attributes_file() {
+    fn test_external_attributes_file_resolves_member_expression() {
         let dir = tempfile::tempdir().unwrap();
 
-        // Create attributes/index.js
+        // Create attributes/index.js with id, name, email, status
         let attrs_dir = dir.path().join("attributes");
         fs::create_dir(&attrs_dir).unwrap();
         fs::write(attrs_dir.join("index.js"), r#"
 export default {
-    users: ["id", "name", "email"],
+    users: ["id", "name", "email", "status"],
 };
 "#).unwrap();
 
-        // Create the query file
+        // Create the query file using attributes.users
         let query_path = dir.path().join("query.js");
         let source = r##"
 import { User } from "#models";
@@ -764,9 +789,77 @@ User.findAll({
         let mut cache = AstCache::new();
         let config = crate::config::Config::default();
         let violations = RequireQueryAttributes.check(source, &query_path, &tree, &mut cache, &config);
-        // The attributes reference is a member expression, not an array literal —
-        // we can't statically extract it, so this tests the cross-file import detection
-        assert!(violations.len() >= 1);
+        // All required attributes are in the external file — no violations
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_external_attributes_file_missing_where_key() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let attrs_dir = dir.path().join("attributes");
+        fs::create_dir(&attrs_dir).unwrap();
+        fs::write(attrs_dir.join("index.js"), r#"
+export default {
+    users: ["id", "name", "email"],
+};
+"#).unwrap();
+
+        let query_path = dir.path().join("query.js");
+        let source = r##"
+import { User } from "#models";
+import attributes from "./attributes";
+
+User.findAll({
+    attributes: attributes.users,
+    where: { status: "active" },
+});
+"##;
+        fs::write(&query_path, source).unwrap();
+
+        let tree = parse_js(source).unwrap();
+        let mut cache = AstCache::new();
+        let config = crate::config::Config::default();
+        let violations = RequireQueryAttributes.check(source, &query_path, &tree, &mut cache, &config);
+        // "status" is in where but not in external attributes
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].fix_suggestion.contains("'status'"));
+    }
+
+    #[test]
+    fn test_external_attributes_with_includes() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let attrs_dir = dir.path().join("attributes");
+        fs::create_dir(&attrs_dir).unwrap();
+        fs::write(attrs_dir.join("index.js"), r#"
+export default {
+    competition: ["companyId", "endsAt", "id", "startsAt", "type"],
+    scorecardMetric: ["archivedAt", "definition", "id", "type"],
+};
+"#).unwrap();
+
+        let query_path = dir.path().join("query.js");
+        let source = r##"
+import { Competition, ScorecardMetric } from "#models";
+import attributes from "./attributes";
+
+Competition.findAll({
+    attributes: attributes.competition,
+    include: [
+        { attributes: attributes.scorecardMetric, model: ScorecardMetric, required: true, where: { archivedAt: null } },
+    ],
+    where: { companyId, type: "instance" },
+});
+"##;
+        fs::write(&query_path, source).unwrap();
+
+        let tree = parse_js(source).unwrap();
+        let mut cache = AstCache::new();
+        let config = crate::config::Config::default();
+        let violations = RequireQueryAttributes.check(source, &query_path, &tree, &mut cache, &config);
+        // All attributes present in external file, including for the include
+        assert!(violations.is_empty());
     }
 
     // --- Multiple queries ---
