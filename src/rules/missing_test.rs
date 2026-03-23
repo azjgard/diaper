@@ -58,7 +58,7 @@ impl Rule for MissingTest {
             rule_name: self.name().to_string(),
             doc_url: self.doc_url().to_string(),
             score,
-            code_sample: format!("no index.spec.js in {}", dir.to_string_lossy()),
+            code_sample: String::new(),
             fix_suggestion: format!("add tests for {display_path} in an index.spec.js in the same directory"),
         }]
     }
@@ -397,9 +397,9 @@ mod tests {
     }
 
     #[test]
-    fn test_violation_code_sample_mentions_directory() {
+    fn test_violation_code_sample_is_empty() {
         let violations = check_with_dir("function handler() {}", false);
-        assert!(violations[0].code_sample.contains("index.spec.js"));
+        assert!(violations[0].code_sample.is_empty());
     }
 
     #[test]
