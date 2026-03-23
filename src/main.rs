@@ -9,8 +9,12 @@ mod watch;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "diaper", version, about = "Score JavaScript files for code smells")]
+#[command(name = "diaper", version, about = "Score JavaScript files for code smells", disable_version_flag = true)]
 struct Cli {
+    /// Print version
+    #[arg(short = 'v', short_alias = 'V', long = "version", action = clap::ArgAction::Version)]
+    version: (),
+
     #[command(subcommand)]
     command: Commands,
 }
