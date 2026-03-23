@@ -10,12 +10,13 @@ fi
 VERSION="$1"
 TAG="v${VERSION}"
 
-# Bump version in Cargo.toml
+# Bump version in Cargo.toml and update Cargo.lock
 echo "Bumping Cargo.toml version to ${VERSION}..."
 sed -i '' "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+cargo check --quiet 2>/dev/null || true
 
 # Commit the version bump
-git add Cargo.toml
+git add Cargo.toml Cargo.lock
 git commit -m "Bump version to ${VERSION}"
 
 # Find the previous tag for generating release notes
