@@ -1,26 +1,16 @@
-# diaper
+# Diaper
 
 <p align="center">
   <img src="https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/diaper-compressed/d7a4302d851948298d29876a26df9cfe.jpg" alt="diaper mascot" width="400">
 </p>
 
+<p align="center">
+  <a href="#usage">Usage</a> · <a href="#output">Output</a> · <a href="#rules">Rules</a> · <a href="#exit-codes">Exit Codes</a> · <a href="#install">Install</a> · <a href="#stink-tiers">Stink Tiers</a> · <a href="#configuration">Configuration</a> · <a href="#json-output">JSON Output</a> · <a href="#development">Development</a>
+</p>
+
 A fast JavaScript code smell scorer built with Rust and tree-sitter. Think of it like ESLint, but focused on structural code smells and designed to help AI agents write better code without constant human babysitting.
 
 Instead of warnings and errors, diaper scores files with **stink points**. Each rule has a configurable score, a fix suggestion, and a documentation reference for agents to learn from.
-
-## Table of Contents
-
-- [Usage](#usage)
-- [Output](#output)
-- [Rules](#rules)
-- [Exit Codes](#exit-codes)
-- [Install](#install)
-- [Stink Tiers](#stink-tiers)
-- [Configuration](#configuration)
-- [JSON Output](#json-output)
-- [Adding Rules](#adding-rules)
-- [Development](#development)
-- [License](#license)
 
 ## Usage
 
