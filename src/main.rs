@@ -3,6 +3,7 @@ mod config;
 mod git;
 mod hook;
 mod rules;
+mod version_check;
 mod watch;
 
 use clap::{Parser, Subcommand};
@@ -231,7 +232,7 @@ fn collect_js_files(dir: &str) -> Vec<String> {
     files
 }
 
-fn main() {
+fn run() -> i32 {
     let cli = Cli::parse();
 
     match cli.command {
@@ -240,7 +241,7 @@ fn main() {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("error: {e}");
-                    std::process::exit(1);
+                    return 1;
                 }
             };
 
@@ -250,7 +251,7 @@ fn main() {
                     if !all.iter().any(|r| r.name() == name.as_str()) {
                         eprintln!("error: unknown rule '{name}'");
                         eprintln!("Run 'diaper rules' to see all available rules.");
-                        std::process::exit(1);
+                        return 1;
                     }
                 }
             }
@@ -268,7 +269,7 @@ fn main() {
                     Ok(files) => files,
                     Err(e) => {
                         eprintln!("error: {e}");
-                        std::process::exit(1);
+                        return 1;
                     }
                 },
             };
@@ -282,31 +283,31 @@ fn main() {
             match result {
                 Ok(has_smells) => {
                     if has_smells {
-                        std::process::exit(1);
+                        return 1;
                     }
                 }
                 Err(e) => {
                     eprintln!("error: {e}");
-                    std::process::exit(1);
+                    return 1;
                 }
             }
         }
         Commands::Watch => {
             if let Err(e) = watch::watch() {
                 eprintln!("error: {e}");
-                std::process::exit(1);
+                return 1;
             }
         }
         Commands::Init => {
             if let Err(e) = config::init_config() {
                 eprintln!("error: {e}");
-                std::process::exit(1);
+                return 1;
             }
         }
         Commands::InstallHooks => {
             if let Err(e) = hook::install_hooks() {
                 eprintln!("error: {e}");
-                std::process::exit(1);
+                return 1;
             }
         }
         Commands::Rules { name, verbose } => {
@@ -317,4 +318,13 @@ fn main() {
             }
         }
     }
+
+    0
+}
+
+fn main() {
+    version_check::spawn_update_check();
+    let exit_code = run();
+    version_check::print_update_notice();
+    std::process::exit(exit_code);
 }
