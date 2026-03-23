@@ -1,6 +1,4 @@
-# `[--diaper--]`
-
-> **Note:** diaper is currently in beta.
+# diaper
 
 ![diaper check output](https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/out/32a66ed039904fa2ac3b5a6875cea0aa.png)
 
