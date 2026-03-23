@@ -1,5 +1,9 @@
 # diaper
 
+<p align="center">
+  <img src="https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/diaper-compressed/d7a4302d851948298d29876a26df9cfe.jpg" alt="diaper mascot" width="400">
+</p>
+
 ![diaper check output](https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/out/32a66ed039904fa2ac3b5a6875cea0aa.png)
 
 A fast JavaScript code smell scorer built with Rust and tree-sitter. Think of it like ESLint, but focused on structural code smells and designed to help AI agents write better code without constant human babysitting.
