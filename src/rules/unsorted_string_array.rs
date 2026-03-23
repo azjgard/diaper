@@ -52,6 +52,11 @@ fn find_unsorted_arrays(
     score: u32,
 ) {
     if node.kind() == "array" {
+        // Skip arrays under an "order" key (e.g. order: [["endsAt", "asc"]])
+        if is_order_value(node, source) {
+            return;
+        }
+
         let strings = extract_string_elements(node, source);
         // Only flag arrays with 2+ string elements and no non-string elements
         if strings.len() >= 2 && is_all_strings(node) {
@@ -74,6 +79,22 @@ fn find_unsorted_arrays(
     for child in node.children(&mut cursor) {
         find_unsorted_arrays(child, source, violations, rule, score);
     }
+}
+
+/// Check if this array node is the value of an "order" key, or nested inside one.
+fn is_order_value(node: tree_sitter::Node, source: &str) -> bool {
+    let mut current = node;
+    while let Some(parent) = current.parent() {
+        if parent.kind() == "pair" {
+            if let Some(key) = parent.child_by_field_name("key") {
+                if &source[key.byte_range()] == "order" {
+                    return true;
+                }
+            }
+        }
+        current = parent;
+    }
+    false
 }
 
 /// Check if all named children of the array are string nodes.
@@ -230,6 +251,45 @@ const b = ["y", "b"];
     #[test]
     fn test_empty_file() {
         let violations = check("");
+        assert!(violations.is_empty());
+    }
+
+    // --- Order exclusion ---
+
+    #[test]
+    fn test_order_2d_array_not_flagged() {
+        let violations = check(r#"const x = { order: [["endsAt", "asc"]] };"#);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_order_2d_array_multiple_not_flagged() {
+        let source = r#"const x = { order: [["endsAt", "asc"], ["startsAt", "desc"]] };"#;
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_order_1d_array_not_flagged() {
+        let violations = check(r#"const x = { order: ["z", "a"] };"#);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_non_order_key_still_flagged() {
+        let violations = check(r#"const x = { sort: ["z", "a"] };"#);
+        assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn test_order_in_sequelize_query() {
+        let source = r#"
+Model.findAll({
+    attributes: ["id", "name"],
+    order: [["name", "desc"], ["createdAt", "asc"]],
+});
+"#;
+        let violations = check(source);
         assert!(violations.is_empty());
     }
 
