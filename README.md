@@ -4,8 +4,6 @@
   <img src="https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/diaper-compressed/d7a4302d851948298d29876a26df9cfe.jpg" alt="diaper mascot" width="400">
 </p>
 
-![diaper check output](https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/out/32a66ed039904fa2ac3b5a6875cea0aa.png)
-
 A fast JavaScript code smell scorer built with Rust and tree-sitter. Think of it like ESLint, but focused on structural code smells and designed to help AI agents write better code without constant human babysitting.
 
 Instead of warnings and errors, diaper scores files with **stink points**. Each rule has a configurable score, a fix suggestion, and a documentation reference for agents to learn from.
@@ -71,23 +69,9 @@ diaper init
 
 ## Output
 
-```
-src/api/handler.js  BLOWOUT 💩 (340)
-  +100  async-await  async function handleRequest() {
-    remove async/await and use synchronous patterns or callbacks
-    https://github.com/jordin/diaper/blob/main/docs/rules/async-await.md
-  +100  upward-relative-import  import ... from "../../core/db"
-    use an alias or move the import to a shared module instead of "../../core/db"
-    ./docs/rules/upward-relative-import.md
-  +60   nested-ternary  const x = a ? b ? c : d : e;
-    extract nested ternary (2 levels) into a sub-function with early returns for each branch
-    https://github.com/jordin/diaper/blob/main/docs/rules/nested-ternary.md
-  +30   file-too-long  430 lines
-    split file into smaller modules (currently 430 lines, threshold 200)
-    https://github.com/jordin/diaper/blob/main/docs/rules/file-too-long.md
-```
+![diaper check output](https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/out/32a66ed039904fa2ac3b5a6875cea0aa.png)
 
-Each violation shows: score, rule name, code sample, fix suggestion (green), and docs path (gray).
+Each violation shows: score, rule name, code sample, fix suggestion, and docs link.
 
 ## Exit Codes
 
