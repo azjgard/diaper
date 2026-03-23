@@ -23,8 +23,8 @@ struct Cli {
 enum Commands {
     /// Check files for code smells
     Check {
-        /// File or directory path to check (if omitted, checks unstaged git changes)
-        path: Option<String>,
+        /// Files or directories to check (if omitted, checks unstaged git changes)
+        paths: Vec<String>,
         /// Output results as JSON
         #[arg(long)]
         json: bool,
@@ -242,7 +242,7 @@ fn run() -> i32 {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Check { path, json, rules: rule_filter } => {
+        Commands::Check { paths, json, rules: rule_filter } => {
             let config = match config::Config::load() {
                 Ok(c) => c,
                 Err(e) => {
@@ -262,22 +262,25 @@ fn run() -> i32 {
                 }
             }
 
-            let files = match path {
-                Some(p) => {
-                    let meta = std::fs::metadata(&p);
-                    if meta.as_ref().map(|m| m.is_dir()).unwrap_or(false) {
-                        collect_js_files(&p)
-                    } else {
-                        vec![p]
-                    }
-                }
-                None => match git::unstaged_changed_files() {
+            let files = if paths.is_empty() {
+                match git::unstaged_changed_files() {
                     Ok(files) => files,
                     Err(e) => {
                         eprintln!("error: {e}");
                         return 1;
                     }
-                },
+                }
+            } else {
+                let mut all_files = Vec::new();
+                for p in paths {
+                    let meta = std::fs::metadata(&p);
+                    if meta.as_ref().map(|m| m.is_dir()).unwrap_or(false) {
+                        all_files.extend(collect_js_files(&p));
+                    } else {
+                        all_files.push(p);
+                    }
+                }
+                all_files
             };
 
             let result = if json {
