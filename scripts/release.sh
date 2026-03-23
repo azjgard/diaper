@@ -71,6 +71,7 @@ echo "Creating GitHub release ${TAG}..."
 gh release create "$TAG" \
   --title "$TAG" \
   --notes "$NOTES" \
+  --latest \
   "${TMPDIR}/${DARWIN_ASSET}" \
   "${TMPDIR}/${LINUX_ASSET}"
 
