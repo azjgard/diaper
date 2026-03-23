@@ -91,10 +91,12 @@ pub fn check_file(path: &str, cache: &mut AstCache, config: &Config, rule_filter
         violations.append(&mut rule_violations);
     }
 
-    // Override doc_url with config docs path if configured
+    // Only show doc_url if explicitly configured in diaper.yml
     for violation in &mut violations {
         if let Some(docs) = config.rule_docs(&violation.rule_name) {
             violation.doc_url = docs;
+        } else {
+            violation.doc_url = String::new();
         }
     }
 
@@ -139,7 +141,9 @@ pub fn check_files(paths: &[String], config: &Config, rule_filter: &[String]) ->
             for violation in &result.violations {
                 println!("  {YELLOW}+{}{RESET}  {CYAN}{}{RESET}  {}", violation.score, violation.rule_name, violation.code_sample);
                 println!("    {GREEN}{}{RESET}", violation.fix_suggestion);
-                println!("    {DIM}{}{RESET}", violation.doc_url);
+                if !violation.doc_url.is_empty() {
+                    println!("    {DIM}{}{RESET}", violation.doc_url);
+                }
                 println!();
             }
         }
@@ -169,7 +173,8 @@ struct JsonViolation {
     code_sample: String,
     #[serde(rename = "fixSuggestion")]
     fix_suggestion: String,
-    reference: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reference: Option<String>,
 }
 
 /// Check multiple files and print results as JSON. Returns true if any smells were found.
@@ -198,7 +203,7 @@ pub fn check_files_json(paths: &[String], config: &Config, rule_filter: &[String
                     stink_score: v.score,
                     code_sample: v.code_sample,
                     fix_suggestion: v.fix_suggestion,
-                    reference: v.doc_url,
+                    reference: if v.doc_url.is_empty() { None } else { Some(v.doc_url) },
                 }).collect(),
             });
         }
