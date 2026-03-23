@@ -44,6 +44,27 @@ pub fn unstaged_changed_files() -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+/// Returns .js files changed between the given git ref and HEAD.
+pub fn diff_files(git_ref: &str) -> Result<Vec<String>, String> {
+    let output = Command::new("git")
+        .args(["diff", &format!("{git_ref}...HEAD"), "--name-only", "--diff-filter=d", "--", "*.js"])
+        .output()
+        .map_err(|e| format!("failed to run git diff: {e}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git diff failed: {stderr}"));
+    }
+
+    let files: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| l.to_string())
+        .collect();
+
+    Ok(files)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

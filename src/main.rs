@@ -32,6 +32,18 @@ enum Commands {
         #[arg(long = "rule", short = 'r', value_delimiter = ',')]
         rules: Vec<String>,
     },
+    /// Check files changed between a git ref and HEAD
+    CheckDiff {
+        /// Git ref to diff against (branch, tag, or commit)
+        #[arg(name = "ref")]
+        git_ref: String,
+        /// Output results as JSON
+        #[arg(long)]
+        json: bool,
+        /// Only run specific rules (repeatable or comma-separated)
+        #[arg(long = "rule", short = 'r', value_delimiter = ',')]
+        rules: Vec<String>,
+    },
     /// Watch for file changes and re-run checks
     Watch,
     /// Generate a default diaper.yml config file
@@ -281,6 +293,52 @@ fn run() -> i32 {
                     }
                 }
                 all_files
+            };
+
+            let result = if json {
+                check::check_files_json(&files, &config, &rule_filter)
+            } else {
+                check::check_files(&files, &config, &rule_filter)
+            };
+
+            match result {
+                Ok(has_smells) => {
+                    if has_smells {
+                        return 1;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    return 1;
+                }
+            }
+        }
+        Commands::CheckDiff { git_ref, json, rules: rule_filter } => {
+            let config = match config::Config::load() {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    return 1;
+                }
+            };
+
+            if !rule_filter.is_empty() {
+                let all = rules::all_rules();
+                for name in &rule_filter {
+                    if !all.iter().any(|r| r.name() == name.as_str()) {
+                        eprintln!("error: unknown rule '{name}'");
+                        eprintln!("Run 'diaper rules' to see all available rules.");
+                        return 1;
+                    }
+                }
+            }
+
+            let files = match git::diff_files(&git_ref) {
+                Ok(files) => files,
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    return 1;
+                }
             };
 
             let result = if json {
