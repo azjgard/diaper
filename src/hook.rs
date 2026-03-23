@@ -219,22 +219,21 @@ fn install_hooks_to(hooks_dir: &std::path::Path, settings_file: &std::path::Path
     });
     let pre_edit_added = add_hook_to_settings(&mut settings, "PreToolUse", PRE_EDIT_HOOK_SCRIPT, pre_edit_entry)?;
 
-    if !stop_added && !pre_edit_added {
-        println!("all hooks already installed in settings.json, skipping");
-        return Ok(());
-    }
+    if stop_added || pre_edit_added {
+        let output = serde_json::to_string_pretty(&settings)
+            .map_err(|e| format!("failed to serialize settings.json: {e}"))?;
 
-    let output = serde_json::to_string_pretty(&settings)
-        .map_err(|e| format!("failed to serialize settings.json: {e}"))?;
+        fs::write(settings_file, output + "\n")
+            .map_err(|e| format!("failed to write settings.json: {e}"))?;
 
-    fs::write(settings_file, output + "\n")
-        .map_err(|e| format!("failed to write settings.json: {e}"))?;
-
-    if stop_added {
-        println!("added stop hook to {}", settings_file.display());
-    }
-    if pre_edit_added {
-        println!("added pre-edit hook to {}", settings_file.display());
+        if stop_added {
+            println!("added stop hook to {}", settings_file.display());
+        }
+        if pre_edit_added {
+            println!("added pre-edit hook to {}", settings_file.display());
+        }
+    } else {
+        println!("settings.json already up to date");
     }
     println!();
     println!("diaper hooks installed:");
@@ -652,6 +651,37 @@ mod tests {
         // existing Stop preserved + new one added
         assert_eq!(settings["hooks"]["Stop"].as_array().unwrap().len(), 2);
         // PreToolUse added
+        assert_eq!(settings["hooks"]["PreToolUse"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_install_adds_pre_edit_when_stop_already_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let hdir = dir.path().join("hooks");
+        let settings_path = dir.path().join("settings.json");
+
+        // Simulate existing settings from old install-hook command
+        let existing = serde_json::json!({
+            "hooks": {
+                "Stop": [{
+                    "hooks": [{
+                        "type": "command",
+                        "command": format!("{}/diaper-check.sh", hdir.display()),
+                        "statusMessage": "Running diaper check..."
+                    }]
+                }]
+            }
+        });
+        fs::write(&settings_path, serde_json::to_string_pretty(&existing).unwrap()).unwrap();
+
+        install_hooks_to(&hdir, &settings_path).unwrap();
+
+        let contents = fs::read_to_string(&settings_path).unwrap();
+        let settings: serde_json::Value = serde_json::from_str(&contents).unwrap();
+
+        // Stop hook should NOT be duplicated
+        assert_eq!(settings["hooks"]["Stop"].as_array().unwrap().len(), 1);
+        // PreToolUse should be added
         assert_eq!(settings["hooks"]["PreToolUse"].as_array().unwrap().len(), 1);
     }
 
