@@ -30,15 +30,19 @@ Use `scripts/release.sh <version>` to cut a release. It bumps `Cargo.toml`, comm
 bash scripts/release.sh 0.4.0-beta
 ```
 
-After the release is created, update the auto-generated release notes to match the format of prior releases. Organize changes into sections:
+After the release is created, update the auto-generated release notes to match the format of prior releases:
 
-- **New Features** — New CLI flags, commands, or user-facing capabilities
-- **New Rules** — New rules with name, default score, and one-line description
-- **Rule Changes** — Behavioral changes to existing rules (exclusions, renames, scope changes)
-- **Bug Fixes & Docs** — Corrections to rule behavior or examples
-- **Infrastructure** — Build, CI, e2e, or internal tooling changes
+1. **Find the previous tag** by running `git tag --sort=-creatordate | head -5`. The previous tag is the one immediately before the new release — do NOT assume it from conversation context, as other agents or sessions may have created tags you're unaware of.
+2. **Scope the notes** to only commits in `git log <previous-tag>..<new-tag>`. Do not include changes from earlier releases.
+3. **Organize into sections** (omit empty sections):
+   - **New Features** — New CLI flags, commands, or user-facing capabilities
+   - **New Rules** — New rules with name, default score, and one-line description
+   - **Rule Changes** — Behavioral changes to existing rules (exclusions, renames, scope changes)
+   - **Bug Fixes & Docs** — Corrections to rule behavior or examples
+   - **Infrastructure** — Build, CI, e2e, or internal tooling changes
+4. **End with a Full Changelog link** comparing the previous tag to the new one: `https://github.com/azjgard/diaper/compare/<previous-tag>...<new-tag>`
 
-End with a **Full Changelog** link comparing the previous tag to the new one. Use `gh release edit <tag> --notes "..."` to update.
+Use `gh release edit <tag> --notes "..."` to update.
 
 ## Tech Stack
 
