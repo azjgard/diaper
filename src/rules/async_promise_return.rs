@@ -208,6 +208,7 @@ fn returns_promise(node: tree_sitter::Node, source: &str) -> bool {
         || text.contains("Promise.race")
         || text.contains("new Promise")
         || text.contains("pipe(")
+        || text.contains(".query(")
     {
         return true;
     }
@@ -472,6 +473,28 @@ mod tests {
     fn test_return_async_suffixed_bare_call_not_flagged() {
         let source = r#"export default (ctx) => {
             return processDataAsync(ctx);
+        };"#;
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_return_db_connection_query_not_flagged() {
+        let source = r#"export default (ctx) => {
+            return dbConnection.query(getQueryString({ lastId, location }), {
+                nest: true,
+                replacements: { companyIds, lastId },
+                type: QueryTypes.SELECT,
+            });
+        };"#;
+        let violations = check(source);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_return_sequelize_query_not_flagged() {
+        let source = r#"export default (ctx) => {
+            return sequelize.query("SELECT * FROM users", { type: QueryTypes.SELECT });
         };"#;
         let violations = check(source);
         assert!(violations.is_empty());
