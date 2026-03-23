@@ -11,6 +11,7 @@ const GREEN: &str = "\x1b[32m";
 const YELLOW: &str = "\x1b[33m";
 const ORANGE: &str = "\x1b[38;5;208m";
 const RED: &str = "\x1b[31m";
+const CYAN: &str = "\x1b[36m";
 const DIM: &str = "\x1b[2m";
 const BOLD: &str = "\x1b[1m";
 const RESET: &str = "\x1b[0m";
@@ -136,7 +137,7 @@ pub fn check_files(paths: &[String], config: &Config, rule_filter: &[String]) ->
                 result.path, tier.color, tier.name, tier.emoji, result.total_score
             );
             for violation in &result.violations {
-                println!("  {YELLOW}+{}{RESET}  {DIM}{}{RESET}  {}", violation.score, violation.rule_name, violation.code_sample);
+                println!("  {YELLOW}+{}{RESET}  {CYAN}{}{RESET}  {}", violation.score, violation.rule_name, violation.code_sample);
                 println!("    {GREEN}{}{RESET}", violation.fix_suggestion);
                 println!("    {DIM}{}{RESET}", violation.doc_url);
                 println!();
