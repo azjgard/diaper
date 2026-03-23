@@ -139,8 +139,8 @@ pub fn check_files(paths: &[String], config: &Config, rule_filter: &[String]) ->
                 println!("  {YELLOW}+{}{RESET}  {DIM}{}{RESET}  {}", violation.score, violation.rule_name, violation.code_sample);
                 println!("    {GREEN}{}{RESET}", violation.fix_suggestion);
                 println!("    {DIM}{}{RESET}", violation.doc_url);
+                println!();
             }
-            println!();
         }
     }
 
