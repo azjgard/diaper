@@ -56,10 +56,45 @@ pub fn print_update_notice() {
     }
 
     let current = env!("CARGO_PKG_VERSION");
-    if latest != current {
+    if is_newer(&latest, current) {
         eprintln!();
         eprintln!("{BOLD}Update available:{RESET} {YELLOW}v{current}{RESET} -> {GREEN}v{latest}{RESET}");
         eprintln!("Run {BOLD}diaper update{RESET} to install the latest version.");
+    }
+}
+
+/// Parse a version string like "1.2.3" or "1.2.3-beta" into (major, minor, patch, prerelease).
+/// Strips a leading "v" if present.
+fn parse_version(v: &str) -> (u32, u32, u32, &str) {
+    let v = v.strip_prefix('v').unwrap_or(v);
+    let (version_part, pre) = match v.find('-') {
+        Some(i) => (&v[..i], &v[i + 1..]),
+        None => (v, ""),
+    };
+    let parts: Vec<u32> = version_part.split('.').filter_map(|s| s.parse().ok()).collect();
+    let major = parts.first().copied().unwrap_or(0);
+    let minor = parts.get(1).copied().unwrap_or(0);
+    let patch = parts.get(2).copied().unwrap_or(0);
+    (major, minor, patch, pre)
+}
+
+/// Returns true if `latest` is strictly newer than `current`.
+/// Versions are compared as major.minor.patch. If the numeric parts are equal,
+/// a release (no prerelease suffix) is considered newer than a prerelease,
+/// but two different prerelease suffixes at the same numeric version are equal.
+fn is_newer(latest: &str, current: &str) -> bool {
+    let (lmaj, lmin, lpat, lpre) = parse_version(latest);
+    let (cmaj, cmin, cpat, cpre) = parse_version(current);
+
+    match (lmaj.cmp(&cmaj), lmin.cmp(&cmin), lpat.cmp(&cpat)) {
+        (std::cmp::Ordering::Greater, _, _) => true,
+        (std::cmp::Ordering::Less, _, _) => false,
+        (_, std::cmp::Ordering::Greater, _) => true,
+        (_, std::cmp::Ordering::Less, _) => false,
+        (_, _, std::cmp::Ordering::Greater) => true,
+        (_, _, std::cmp::Ordering::Less) => false,
+        // Same numeric version: release > prerelease
+        _ => lpre.is_empty() && !cpre.is_empty(),
     }
 }
 
@@ -87,7 +122,7 @@ pub fn update() -> Result<(), String> {
     print!("Checking for updates... ");
     let latest = fetch_latest_version()?;
 
-    if latest == current {
+    if !is_newer(&latest, current) {
         println!("{GREEN}Already up to date ✅{RESET}");
         return Ok(());
     }
@@ -154,5 +189,112 @@ mod tests {
         let path = dir.path().join(STATE_FILE);
         fs::write(&path, "").unwrap();
         // Should not panic on empty file
+    }
+
+    // --- parse_version ---
+
+    #[test]
+    fn test_parse_version_simple() {
+        assert_eq!(parse_version("1.2.3"), (1, 2, 3, ""));
+    }
+
+    #[test]
+    fn test_parse_version_with_prerelease() {
+        assert_eq!(parse_version("1.2.3-beta"), (1, 2, 3, "beta"));
+    }
+
+    #[test]
+    fn test_parse_version_strips_v_prefix() {
+        assert_eq!(parse_version("v1.2.3"), (1, 2, 3, ""));
+    }
+
+    #[test]
+    fn test_parse_version_v_prefix_with_prerelease() {
+        assert_eq!(parse_version("v0.4.1-beta"), (0, 4, 1, "beta"));
+    }
+
+    // --- is_newer ---
+
+    #[test]
+    fn test_is_newer_major_bump() {
+        assert!(is_newer("2.0.0", "1.0.0"));
+    }
+
+    #[test]
+    fn test_is_newer_minor_bump() {
+        assert!(is_newer("1.1.0", "1.0.0"));
+    }
+
+    #[test]
+    fn test_is_newer_patch_bump() {
+        assert!(is_newer("1.0.1", "1.0.0"));
+    }
+
+    #[test]
+    fn test_is_newer_same_version() {
+        assert!(!is_newer("1.0.0", "1.0.0"));
+    }
+
+    #[test]
+    fn test_is_newer_older_major() {
+        assert!(!is_newer("1.0.0", "2.0.0"));
+    }
+
+    #[test]
+    fn test_is_newer_older_minor() {
+        assert!(!is_newer("1.0.0", "1.1.0"));
+    }
+
+    #[test]
+    fn test_is_newer_older_patch() {
+        assert!(!is_newer("1.0.0", "1.0.1"));
+    }
+
+    #[test]
+    fn test_is_newer_release_over_prerelease() {
+        assert!(is_newer("1.0.0", "1.0.0-beta"));
+    }
+
+    #[test]
+    fn test_is_newer_prerelease_not_over_release() {
+        assert!(!is_newer("1.0.0-beta", "1.0.0"));
+    }
+
+    #[test]
+    fn test_is_newer_same_prerelease() {
+        assert!(!is_newer("1.0.0-beta", "1.0.0-beta"));
+    }
+
+    #[test]
+    fn test_is_newer_different_prerelease_same_version() {
+        assert!(!is_newer("1.0.0-alpha", "1.0.0-beta"));
+    }
+
+    #[test]
+    fn test_is_newer_higher_prerelease() {
+        assert!(is_newer("1.1.0-beta", "1.0.0-beta"));
+    }
+
+    #[test]
+    fn test_is_newer_lower_prerelease() {
+        assert!(!is_newer("1.0.0-beta", "1.1.0-beta"));
+    }
+
+    #[test]
+    fn test_is_newer_with_v_prefix() {
+        assert!(is_newer("v2.0.0", "v1.0.0"));
+    }
+
+    #[test]
+    fn test_is_newer_mixed_v_prefix() {
+        assert!(is_newer("v2.0.0", "1.0.0"));
+        assert!(!is_newer("1.0.0", "v2.0.0"));
+    }
+
+    #[test]
+    fn test_is_newer_real_versions() {
+        assert!(is_newer("0.4.1-beta", "0.4.0-beta"));
+        assert!(!is_newer("0.4.0-beta", "0.4.1-beta"));
+        assert!(!is_newer("0.4.1-beta", "0.4.1-beta"));
     }
 }
