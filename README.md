@@ -8,6 +8,60 @@ A fast JavaScript code smell scorer built with Rust and tree-sitter. Think of it
 
 Instead of warnings and errors, diaper scores files with **stink points**. Each rule has a configurable score, a fix suggestion, and a documentation reference for agents to learn from.
 
+## Table of Contents
+
+- [Usage](#usage)
+- [Output](#output)
+- [Rules](#rules)
+- [Exit Codes](#exit-codes)
+- [Install](#install)
+- [Stink Tiers](#stink-tiers)
+- [Configuration](#configuration)
+- [JSON Output](#json-output)
+- [Adding Rules](#adding-rules)
+- [Development](#development)
+- [License](#license)
+
+## Usage
+
+```sh
+# Check unstaged git changes
+diaper check
+
+# Check a specific file
+diaper check path/to/file.js
+
+# Only run specific rules
+diaper check --rule file-too-long --rule async-await
+diaper check -r file-too-long,async-await,nested-ternary
+
+# Check with JSON output (for tooling/agents)
+diaper check --json
+
+# Watch for changes and re-run checks
+diaper watch
+
+# Generate a diaper.yml config file with defaults
+diaper init
+```
+
+## Output
+
+![diaper check output](https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/out/32a66ed039904fa2ac3b5a6875cea0aa.png)
+
+Each violation shows: score, rule name, code sample, fix suggestion, and docs link.
+
+## Exit Codes
+
+- **0** — no files reached BLOWOUT tier
+- **1** — at least one file hit BLOWOUT (score >= 100, configurable)
+
+## Rules
+
+![diaper rules](https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/out/df5259531bff462a95ba001bc63713f5.png)
+
+Run `diaper rules <name>` for details, default score, and examples for any rule.
+
 ## Install
 
 ```sh
@@ -44,40 +98,6 @@ cargo build --release
 ln -sf $(pwd)/target/release/diaper ~/bin/diaper
 ```
 
-## Usage
-
-```sh
-# Check unstaged git changes
-diaper check
-
-# Check a specific file
-diaper check path/to/file.js
-
-# Only run specific rules
-diaper check --rule file-too-long --rule async-await
-diaper check -r file-too-long,async-await,nested-ternary
-
-# Check with JSON output (for tooling/agents)
-diaper check --json
-
-# Watch for changes and re-run checks
-diaper watch
-
-# Generate a diaper.yml config file with defaults
-diaper init
-```
-
-## Output
-
-![diaper check output](https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/out/32a66ed039904fa2ac3b5a6875cea0aa.png)
-
-Each violation shows: score, rule name, code sample, fix suggestion, and docs link.
-
-## Exit Codes
-
-- **0** — no files reached BLOWOUT tier
-- **1** — at least one file hit BLOWOUT (score >= 100, configurable)
-
 ## Stink Tiers
 
 | Score | Tier | Emoji |
@@ -86,12 +106,6 @@ Each violation shows: score, rule name, code sample, fix suggestion, and docs li
 | 31-70 | Wet | 💦 |
 | 71-99 | Soiled | 🤢 |
 | 100+ | BLOWOUT | 💩 |
-
-## Rules
-
-![diaper rules](https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/out/df5259531bff462a95ba001bc63713f5.png)
-
-Run `diaper rules <name>` for details, default score, and examples for any rule.
 
 ## Configuration
 
