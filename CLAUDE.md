@@ -40,7 +40,28 @@ After the release is created, update the auto-generated release notes to match t
    - **Rule Changes** — Behavioral changes to existing rules (exclusions, renames, scope changes)
    - **Bug Fixes & Docs** — Corrections to rule behavior or examples
    - **Infrastructure** — Build, CI, e2e, or internal tooling changes
-4. **End with a Full Changelog link** comparing the previous tag to the new one: `https://github.com/azjgard/diaper/compare/<previous-tag>...<new-tag>`
+4. **Add a screenshot** of the most relevant new feature or change using `upload-terminal-image` (available at `~/bin/upload-terminal-image`). This tool runs a command via `termshot`, uploads the screenshot, and prints a public URL.
+   - Create a small wrapper script in `/tmp/` that `cd`s into the project dir, sets up any needed state, and runs the command. Don't use `bash -c` — termshot doesn't handle it well.
+   - Run `termshot` without `--show-cmd` (omit the flag) so the wrapper script path doesn't appear in the image.
+   - Keep the output short (2-3 violations max) so it fits in termshot's pseudo terminal buffer. Use a small sample file if needed.
+   - Example workflow:
+     ```sh
+     # Create wrapper script
+     cat > /tmp/ss.sh << 'EOF'
+     #!/bin/bash
+     cd /Users/jordin/projects/diaper
+     ./target/release/diaper rules --verbose
+     EOF
+     chmod +x /tmp/ss.sh
+
+     # Capture and upload (without --show-cmd)
+     tmpdir=$(mktemp -d)
+     termshot --filename "$tmpdir/out.png" -- /tmp/ss.sh >&2
+     ~/bin/upload-image "$tmpdir/out.png"
+     rm -rf "$tmpdir"
+     ```
+   - Embed in release notes as `![description](url)`
+5. **End with a Full Changelog link** comparing the previous tag to the new one: `https://github.com/azjgard/diaper/compare/<previous-tag>...<new-tag>`
 
 Use `gh release edit <tag> --notes "..."` to update.
 
