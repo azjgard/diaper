@@ -101,28 +101,9 @@ Each violation shows: score, rule name, code sample, fix suggestion (green), and
 
 ## Rules
 
-| Rule | Default Score | Description |
-|------|-------------|-------------|
-| `async-await` | 100 per use | Flags `async`/`await` keywords |
-| `async-promise-return` | 15 per return | Non-Promise returns in `-async` folder functions |
-| `ctx-destructure` | 10 per access | Direct `ctx.foo` access instead of destructuring |
-| `distinct-array` | 20 per pattern | Manual array dedup instead of `distinct()` |
-| `file-too-long` | 10 per 50 lines over 200 | Files over 200 lines accumulate stink |
-| `graphql-type-export` | 100 per type | GraphQL types not using default export in type files |
-| `missing-test` | 50 per file | Files with functions or logic missing a sibling `index.spec.js` |
-| `mock-models` | 100 per mock | `jest.mock("#models", ...)` in `index.spec.js` files |
-| `nested-ternary` | 60 per nested ternary | Nested ternary expressions (2+ levels deep) |
-| `non-default-export` | 50 per function | Any function that isn't the default export |
-| `non-idempotent-migration` | 50 per call | `addColumn`/`removeColumn` in migrations |
-| `pipe-property-init` | 100 per property | Pipe flow properties not initialized in parent pipe call |
-| `reduce-param-name` | 70 per call | `.reduce()` callback first param not named `prevVal` |
-| `require-query-attributes` | 10 per query | Sequelize queries missing explicit `attributes` |
-| `short-iter-param` | 15 per call | Iterator callback item param 3 chars or less |
-| `sql-table-alias` | 100 per alias | Table aliases in raw SQL queries |
-| `unsorted-string-array` | 5 per array | String arrays not in alphabetical order |
-| `upward-relative-import` | 100 per import | Imports using `../` paths (unless path contains "shared") |
+![diaper rules](https://pub-2e7c0956321d48409c49627cc2bb6d79.r2.dev/images/out/df5259531bff462a95ba001bc63713f5.png)
 
-Most rules exclude `index.spec.js` and `/migrations/` paths. Exceptions: `mock-models` only runs on `index.spec.js`, `non-idempotent-migration` only runs on migration files. Every rule includes a fix suggestion and documentation link.
+Run `diaper rules <name>` for details, default score, and examples for any rule.
 
 ## Configuration
 
