@@ -177,37 +177,19 @@ fn extract_function_from_var_decl<'a>(node: tree_sitter::Node<'a>, source: &'a s
         if child.kind() == "variable_declarator" {
             let name = child.child_by_field_name("name")?;
             let value = child.child_by_field_name("value")?;
-            match value.kind() {
-                "arrow_function" | "function" => {
-                    return Some((&source[name.byte_range()], value));
-                }
-                // Check for async arrow: the value might be the arrow_function itself
-                // or it could be wrapped
-                _ => {
-                    if contains_function_node(value) {
-                        return Some((&source[name.byte_range()], value));
-                    }
-                }
+            if contains_function_node(value) {
+                return Some((&source[name.byte_range()], value));
             }
         }
     }
     None
 }
 
-/// Check if a node is or contains a function expression.
+/// Check if a node is a function expression (arrow or function keyword).
+/// Only checks the immediate node, not descendants — a call expression
+/// like `.map(() => ...)` that takes a callback is not itself a function.
 fn contains_function_node(node: tree_sitter::Node) -> bool {
-    match node.kind() {
-        "arrow_function" | "function" => true,
-        _ => {
-            let mut cursor = node.walk();
-            for child in node.children(&mut cursor) {
-                if contains_function_node(child) {
-                    return true;
-                }
-            }
-            false
-        }
-    }
+    matches!(node.kind(), "arrow_function" | "function" | "function_expression")
 }
 
 /// Check if a function is recursive (calls itself by name in its body).
@@ -439,6 +421,30 @@ mod tests {
     #[test]
     fn test_empty_file() {
         let violations = check("");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_const_with_map_callback_not_flagged() {
+        let violations = check("const VALID_COLUMNS = notificationGroupMetadata.map((group) => group.column);");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_const_with_filter_callback_not_flagged() {
+        let violations = check("const active = users.filter((u) => u.active);");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_const_with_chained_calls_not_flagged() {
+        let violations = check("const names = items.filter((i) => i.valid).map((i) => i.name);");
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_const_with_reduce_not_flagged() {
+        let violations = check("const total = nums.reduce((sum, n) => sum + n, 0);");
         assert!(violations.is_empty());
     }
 
