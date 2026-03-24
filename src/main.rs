@@ -69,17 +69,17 @@ const DIM: &str = "\x1b[2m";
 const BOLD: &str = "\x1b[1m";
 const RESET: &str = "\x1b[0m";
 
-fn print_rules_list() {
-    let all = rules::all_rules();
-    println!("{BOLD}diaper rules{RESET} ({} total)\n", all.len());
+fn print_rules_list(repo: &str) {
+    let all = rules::rules_for_repo(repo);
+    println!("{BOLD}diaper rules{RESET} for {CYAN}{repo}{RESET} ({} total)\n", all.len());
     for rule in &all {
         println!("  {CYAN}{}{RESET} {DIM}-{RESET} {}", rule.name(), rule.description());
     }
     println!("\n{DIM}Run 'diaper rules <name>' for details and examples.{RESET}");
 }
 
-fn print_rule_detail_by_name(name: &str) {
-    let all = rules::all_rules();
+fn print_rule_detail_by_name(name: &str, repo: &str) {
+    let all = rules::rules_for_repo(repo);
     let rule = match all.iter().find(|r| r.name() == name) {
         Some(r) => r,
         None => {
@@ -118,14 +118,33 @@ fn print_rule_detail(rule: &dyn rules::Rule) {
     }
 }
 
-fn print_rules_verbose() {
-    let all = rules::all_rules();
-    println!("{BOLD}diaper rules{RESET} ({} total)\n", all.len());
+fn print_rules_verbose(repo: &str) {
+    let all = rules::rules_for_repo(repo);
+    println!("{BOLD}diaper rules{RESET} for {CYAN}{repo}{RESET} ({} total)\n", all.len());
     for (i, rule) in all.iter().enumerate() {
         if i > 0 {
             println!("\n{DIM}---{RESET}\n");
         }
         print_rule_detail(rule.as_ref());
+    }
+}
+
+/// Detect the repo or exit with a message if unrecognized.
+fn detect_repo_or_exit() -> String {
+    match git::detect_repo() {
+        Some(repo) => {
+            if rules::rules_for_repo(&repo).is_empty() {
+                eprintln!("No rules configured for repo '{repo}'.");
+                eprintln!("Known repos: {}", rules::KNOWN_REPOS.join(", "));
+                std::process::exit(0);
+            }
+            repo
+        }
+        None => {
+            eprintln!("Could not detect repo from git remote.");
+            eprintln!("Known repos: {}", rules::KNOWN_REPOS.join(", "));
+            std::process::exit(0);
+        }
     }
 }
 
@@ -255,6 +274,7 @@ fn run() -> i32 {
 
     match cli.command {
         Commands::Check { paths, json, rules: rule_filter } => {
+            let repo = detect_repo_or_exit();
             let config = match config::Config::load() {
                 Ok(c) => c,
                 Err(e) => {
@@ -264,7 +284,7 @@ fn run() -> i32 {
             };
 
             if !rule_filter.is_empty() {
-                let all = rules::all_rules();
+                let all = rules::rules_for_repo(&repo);
                 for name in &rule_filter {
                     if !all.iter().any(|r| r.name() == name.as_str()) {
                         eprintln!("error: unknown rule '{name}'");
@@ -296,9 +316,9 @@ fn run() -> i32 {
             };
 
             let result = if json {
-                check::check_files_json(&files, &config, &rule_filter)
+                check::check_files_json(&files, &config, &rule_filter, &repo)
             } else {
-                check::check_files(&files, &config, &rule_filter)
+                check::check_files(&files, &config, &rule_filter, &repo)
             };
 
             match result {
@@ -314,6 +334,7 @@ fn run() -> i32 {
             }
         }
         Commands::CheckDiff { git_ref, json, rules: rule_filter } => {
+            let repo = detect_repo_or_exit();
             let config = match config::Config::load() {
                 Ok(c) => c,
                 Err(e) => {
@@ -323,7 +344,7 @@ fn run() -> i32 {
             };
 
             if !rule_filter.is_empty() {
-                let all = rules::all_rules();
+                let all = rules::rules_for_repo(&repo);
                 for name in &rule_filter {
                     if !all.iter().any(|r| r.name() == name.as_str()) {
                         eprintln!("error: unknown rule '{name}'");
@@ -342,9 +363,9 @@ fn run() -> i32 {
             };
 
             let result = if json {
-                check::check_files_json(&files, &config, &rule_filter)
+                check::check_files_json(&files, &config, &rule_filter, &repo)
             } else {
-                check::check_files(&files, &config, &rule_filter)
+                check::check_files(&files, &config, &rule_filter, &repo)
             };
 
             match result {
@@ -384,10 +405,11 @@ fn run() -> i32 {
             }
         }
         Commands::Rules { name, verbose } => {
+            let repo = detect_repo_or_exit();
             match name {
-                Some(n) => print_rule_detail_by_name(&n),
-                None if verbose => print_rules_verbose(),
-                None => print_rules_list(),
+                Some(n) => print_rule_detail_by_name(&n, &repo),
+                None if verbose => print_rules_verbose(&repo),
+                None => print_rules_list(&repo),
             }
         }
     }

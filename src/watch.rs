@@ -21,11 +21,11 @@ pub fn should_ignore(path: &Path) -> bool {
 }
 
 /// Run the check once and print results with a timestamp header.
-fn run_check() {
+fn run_check(repo: &str) {
     // Clear terminal
     print!("\x1B[2J\x1B[1;1H");
 
-    println!("diaper watch\n");
+    println!("diaper watch ({repo})\n");
 
     let files = match git::unstaged_changed_files() {
         Ok(f) => f,
@@ -36,13 +36,20 @@ fn run_check() {
     };
 
     let config = config::Config::load().unwrap_or_default();
-    if let Err(e) = check::check_files(&files, &config, &[]).map(|_| ()) {
+    if let Err(e) = check::check_files(&files, &config, &[], repo).map(|_| ()) {
         eprintln!("error: {e}");
     }
 }
 
 /// Watch the current directory for changes and re-run diaper check.
 pub fn watch() -> Result<(), String> {
+    let repo = git::detect_repo()
+        .ok_or_else(|| "Could not detect repo from git remote.".to_string())?;
+
+    if crate::rules::rules_for_repo(&repo).is_empty() {
+        return Err(format!("No rules configured for repo '{repo}'."));
+    }
+
     let (tx, rx) = mpsc::channel();
 
     let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
@@ -58,7 +65,7 @@ pub fn watch() -> Result<(), String> {
         .map_err(|e| format!("failed to watch directory: {e}"))?;
 
     // Run check immediately on start
-    run_check();
+    run_check(&repo);
 
     let debounce = Duration::from_millis(300);
     let mut last_run = Instant::now();
@@ -72,7 +79,7 @@ pub fn watch() -> Result<(), String> {
                     // Drain any queued events
                     while rx.try_recv().is_ok() {}
                     last_run = Instant::now();
-                    run_check();
+                    run_check(&repo);
                 }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {

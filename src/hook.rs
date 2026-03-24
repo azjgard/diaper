@@ -23,9 +23,6 @@ fn generate_hook_script() -> String {
     let mut script = String::new();
     script.push_str("#!/bin/bash\n");
     script.push('\n');
-    script.push_str("# Only run in api-gateway projects\n");
-    script.push_str("[[ \"$PWD\" != *\"api-gateway\"* ]] && exit 0\n");
-    script.push('\n');
     script.push_str("# Only run if there are unstaged changes to JavaScript files\n");
     script.push_str("git diff --name-only -- '*.js' | grep -q . || exit 0\n");
     script.push('\n');
@@ -56,9 +53,6 @@ fn generate_pre_edit_hook_script() -> String {
 
     let mut script = String::new();
     script.push_str("#!/bin/bash\n");
-    script.push('\n');
-    script.push_str("# Only run in api-gateway projects\n");
-    script.push_str("[[ \"$PWD\" != *\"api-gateway\"* ]] && exit 0\n");
     script.push('\n');
     script.push_str("# Read hook input from stdin\n");
     script.push_str("INPUT=$(cat)\n");
@@ -277,9 +271,10 @@ mod tests {
     // --- generate_hook_script (stop hook) tests ---
 
     #[test]
-    fn test_stop_script_contains_api_gateway_check() {
+    fn test_stop_script_no_repo_hardcode() {
         let script = generate_hook_script();
-        assert!(script.contains("api-gateway"));
+        // Repo detection is now handled by diaper itself, not the hook script
+        assert!(!script.contains("api-gateway"));
     }
 
     #[test]
@@ -342,9 +337,10 @@ mod tests {
     }
 
     #[test]
-    fn test_pre_edit_script_contains_api_gateway_check() {
+    fn test_pre_edit_script_no_repo_hardcode() {
         let script = generate_pre_edit_hook_script();
-        assert!(script.contains("api-gateway"));
+        // Repo detection is now handled by diaper itself, not the hook script
+        assert!(!script.contains("api-gateway"));
     }
 
     #[test]
