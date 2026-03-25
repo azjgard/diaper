@@ -76,9 +76,8 @@ fn extract_string_text(node: tree_sitter::Node, source: &str) -> String {
             "string_fragment" | "\"" | "'" | "`" => {
                 result.push_str(&source[child.byte_range()]);
             }
-            "template_substitution" => {
-                result.push_str("placeholder");
-            }
+            "template_substitution" => {}
+
             _ => {}
         }
     }
@@ -489,6 +488,15 @@ const q2 = "SELECT * FROM orders o";
     fn test_subquery_not_matched() {
         // Parenthesized subquery — `(SELECT ...)` doesn't match `\w+`
         let violations = check(r#"const q = "SELECT * FROM (SELECT id FROM users) sub";"#);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_template_substitution_not_treated_as_alias() {
+        // Template expressions between a table and a JOIN should not produce a
+        // false-positive alias violation.
+        let source = r#"const q = `SELECT * FROM "submissions" ${hasFilter ? `JOIN "requests" ON "submissions"."requestId" = "requests"."id"` : ""} WHERE "submissions"."companyId" = :companyId`;"#;
+        let violations = check(source);
         assert!(violations.is_empty());
     }
 
