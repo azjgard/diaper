@@ -174,9 +174,18 @@ fn collect_violations(
                     doc_url: rule.doc_url().to_string(),
                     score,
                     code_sample: line.trim().to_string(),
-                    fix_suggestion: format!(
-                        "Remove the alias `{alias}` from table `{table}` — use the full table name, or if an alias is needed, include the original table name in it (e.g. `sender{table}`)"
-                    ),
+                    fix_suggestion: {
+                        let capitalized_table: String = {
+                            let mut chars = table.chars();
+                            match chars.next() {
+                                Some(c) => c.to_uppercase().chain(chars).collect(),
+                                None => table.clone(),
+                            }
+                        };
+                        format!(
+                            "Remove the alias `{alias}` from table `{table}` — use the full table name, or if an alias is needed, include the original table name in it (e.g. `sender{capitalized_table}`)"
+                        )
+                    },
                 });
             }
         }
@@ -521,6 +530,13 @@ const q2 = "SELECT * FROM orders o";
         assert!(violations[0].fix_suggestion.contains("users"));
         assert!(violations[0].fix_suggestion.contains("`u`"));
         assert!(violations[0].fix_suggestion.contains("include the original table name"));
+        assert!(violations[0].fix_suggestion.contains("senderUsers"));
+    }
+
+    #[test]
+    fn test_violation_fix_suggestion_capitalizes_table_name() {
+        let violations = check(r#"const q = "SELECT * FROM rateServiceSubmissions s";"#);
+        assert!(violations[0].fix_suggestion.contains("senderRateServiceSubmissions"));
     }
 
     #[test]
