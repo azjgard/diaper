@@ -105,6 +105,26 @@ fn find_table_refs(sql: &str) -> Vec<TableRef> {
     refs
 }
 
+/// Check if `alias` contains the table name with proper camelCase boundaries.
+/// The table name can appear at the start of the alias exactly as-is (e.g.
+/// `companyUsersTeam`), or in the middle/end with its first letter upper-cased
+/// to form a proper camelCase boundary (e.g. `teamCompanyUsers`).
+fn alias_contains_table_name(alias: &str, table: &str) -> bool {
+    // Exact table name at the start of the alias (suffix style: companyUsersTeam).
+    if alias.starts_with(table) {
+        return true;
+    }
+    // Capitalized table name anywhere in the alias (prefix style: teamCompanyUsers).
+    let mut chars = table.chars();
+    if let Some(first) = chars.next() {
+        let capitalized: String = first.to_uppercase().chain(chars).collect();
+        if alias.contains(&capitalized) {
+            return true;
+        }
+    }
+    false
+}
+
 fn check_sql_for_violations(sql: &str) -> Vec<(String, String)> {
     let refs = find_table_refs(sql);
 
@@ -126,7 +146,7 @@ fn check_sql_for_violations(sql: &str) -> Vec<(String, String)> {
                 violations.push((r.table_name.clone(), alias.clone()));
             } else {
                 // Table appears multiple times — violation only if alias doesn't contain table name.
-                if !alias.to_lowercase().contains(&base.to_lowercase()) {
+                if !alias_contains_table_name(alias, base) {
                     violations.push((r.table_name.clone(), alias.clone()));
                 }
             }
@@ -306,6 +326,33 @@ mod tests {
             r#"const q = "SELECT * FROM \"companyUsers\" \"senderCompanyUsers\" JOIN \"companyUsers\" \"recipientCompanyUsers\" ON \"senderCompanyUsers\".id = \"recipientCompanyUsers\".id";"#,
         );
         assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_duplicate_table_alias_prefix_preserves_case() {
+        // "teamCompanyUsers" contains "companyUsers" (case-sensitive) — OK
+        let violations = check(
+            r#"const q = "SELECT * FROM \"companyUsers\" \"teamCompanyUsers\" JOIN \"companyUsers\" \"adminCompanyUsers\" ON \"teamCompanyUsers\".id = \"adminCompanyUsers\".id";"#,
+        );
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_duplicate_table_alias_suffix_preserves_case() {
+        // "companyUsersTeam" contains "companyUsers" (case-sensitive) — OK
+        let violations = check(
+            r#"const q = "SELECT * FROM \"companyUsers\" \"companyUsersTeam\" JOIN \"companyUsers\" \"companyUsersAdmin\" ON \"companyUsersTeam\".id = \"companyUsersAdmin\".id";"#,
+        );
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_duplicate_table_alias_wrong_case_is_violation() {
+        // "teamcompanyUsers" does NOT contain "companyUsers" (case-sensitive) — violation
+        let violations = check(
+            r#"const q = "SELECT * FROM \"companyUsers\" \"teamcompanyUsers\" JOIN \"companyUsers\" \"admincompanyUsers\" ON \"teamcompanyUsers\".id = \"admincompanyUsers\".id";"#,
+        );
+        assert_eq!(violations.len(), 2);
     }
 
     #[test]
