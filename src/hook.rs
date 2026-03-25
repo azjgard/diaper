@@ -1,3 +1,4 @@
+use crate::rules::KNOWN_REPOS;
 use std::fs;
 use std::path::PathBuf;
 
@@ -14,6 +15,20 @@ fn settings_path() -> PathBuf {
     PathBuf::from(home).join(".claude").join("settings.json")
 }
 
+/// Generate a bash snippet that exits early if the current repo is not in KNOWN_REPOS.
+fn repo_guard() -> String {
+    let repos: Vec<&str> = KNOWN_REPOS.to_vec();
+    let mut guard = String::new();
+    guard.push_str("# Only run in known repos\n");
+    guard.push_str("REPO_URL=$(git remote get-url origin 2>/dev/null) || exit 0\n");
+    guard.push_str("REPO_NAME=$(basename \"${REPO_URL%.git}\")\n");
+
+    // Build the case pattern: api-gateway|integration-hub
+    let pattern = repos.join("|");
+    guard.push_str(&format!("case \"$REPO_NAME\" in {pattern}) ;; *) exit 0 ;; esac\n"));
+    guard
+}
+
 fn generate_hook_script() -> String {
     // Find the diaper binary path
     let diaper_bin = std::env::current_exe()
@@ -22,6 +37,8 @@ fn generate_hook_script() -> String {
 
     let mut script = String::new();
     script.push_str("#!/bin/bash\n");
+    script.push('\n');
+    script.push_str(&repo_guard());
     script.push('\n');
     script.push_str("# Only run if there are unstaged changes to JavaScript files\n");
     script.push_str("git diff --name-only -- '*.js' | grep -q . || exit 0\n");
@@ -53,6 +70,8 @@ fn generate_pre_edit_hook_script() -> String {
 
     let mut script = String::new();
     script.push_str("#!/bin/bash\n");
+    script.push('\n');
+    script.push_str(&repo_guard());
     script.push('\n');
     script.push_str("# Read hook input from stdin\n");
     script.push_str("INPUT=$(cat)\n");
@@ -268,13 +287,45 @@ mod tests {
         })
     }
 
+    // --- repo_guard tests ---
+
+    #[test]
+    fn test_repo_guard_exits_on_no_remote() {
+        let guard = repo_guard();
+        assert!(guard.contains("git remote get-url origin"));
+        assert!(guard.contains("|| exit 0"));
+    }
+
+    #[test]
+    fn test_repo_guard_extracts_repo_name() {
+        let guard = repo_guard();
+        assert!(guard.contains("REPO_NAME="));
+        assert!(guard.contains("basename"));
+        assert!(guard.contains(".git"));
+    }
+
+    #[test]
+    fn test_repo_guard_includes_all_known_repos() {
+        let guard = repo_guard();
+        for repo in KNOWN_REPOS {
+            assert!(guard.contains(repo), "repo guard should contain {repo}");
+        }
+    }
+
+    #[test]
+    fn test_repo_guard_exits_for_unknown_repos() {
+        let guard = repo_guard();
+        assert!(guard.contains("*) exit 0"));
+    }
+
     // --- generate_hook_script (stop hook) tests ---
 
     #[test]
-    fn test_stop_script_no_repo_hardcode() {
+    fn test_stop_script_has_repo_guard() {
         let script = generate_hook_script();
-        // Repo detection is now handled by diaper itself, not the hook script
-        assert!(!script.contains("api-gateway"));
+        assert!(script.contains("REPO_NAME="));
+        assert!(script.contains("api-gateway"));
+        assert!(script.contains("integration-hub"));
     }
 
     #[test]
@@ -337,10 +388,11 @@ mod tests {
     }
 
     #[test]
-    fn test_pre_edit_script_no_repo_hardcode() {
+    fn test_pre_edit_script_has_repo_guard() {
         let script = generate_pre_edit_hook_script();
-        // Repo detection is now handled by diaper itself, not the hook script
-        assert!(!script.contains("api-gateway"));
+        assert!(script.contains("REPO_NAME="));
+        assert!(script.contains("api-gateway"));
+        assert!(script.contains("integration-hub"));
     }
 
     #[test]
